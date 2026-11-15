@@ -1,0 +1,23 @@
+# ADR 0007 — Grade recorrente + fila automática de conteúdos
+
+- **Status:** aceito (2026-11-15)
+- **Contexto:** o dono do produto quer automatizar ao máximo a postagem: definir no calendário de quanto em quanto tempo postar em cada rede e deixar a central pegar o próximo conteúdo e postar sozinha. Restrições:
+  - aprovação humana obrigatória (anti-objetivo em [00 §6](../00-visao-geral.md) e política do YouTube);
+  - limites diários das plataformas;
+  - originalidade e monetização ([20](../20-monetizacao.md)).
+- **Decisão:**
+  - Grade de publicação recorrente por conta social (`PostingSchedule`: semanal ou por intervalo).
+  - Fila ordenada de conteúdos aprovados (`QueueEntry`: fixar, prioridade, validade), com cursor por rede.
+  - Um alocador no `scheduler-tick` preenche os horários dos próximos 7 dias e congela a 60 min do horário.
+  - A aprovação continua humana, mas é de **um clique para todas as redes** e pode ser feita **em lote**; é o único passo manual do fluxo (além do TikTok, ADR 0004).
+  - O mecanismo de execução continua o do ADR 0003.
+- **Alternativas:**
+  - Aprovação automática (sem humano): rejeitada pelos anti-objetivos e pela política do YouTube.
+  - Agendamento só manual por publicação: rejeitado, porque não atende o objetivo de automação.
+  - Reciclar conteúdos antigos quando a fila esvazia: rejeitado, por risco de spam e conteúdo repetido, que prejudica alcance e monetização.
+- **Consequências:**
+  - O trabalho diário vira "subir vídeos e aprovar"; o resto é automático.
+  - Novas tabelas `PostingSchedule` e `QueueEntry` e novos campos em `Publication`.
+  - Alertas de fila baixa ou vazia.
+  - Mais escopo na Fase 8.
+  - Detalhes em [11 §7](../11-agendamento.md).
