@@ -1,0 +1,7 @@
+docs
+pnpm-lock.yaml
+.superpowers
+coverage
+dist
+.nuxt
+.output
