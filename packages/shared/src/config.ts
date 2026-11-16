@@ -1,14 +1,5 @@
 import { z } from 'zod'
-
-export class ConfigError extends Error {
-  readonly keys: string[]
-
-  constructor(keys: string[]) {
-    super(`Configuração inválida: ${keys.join(', ')}`)
-    this.name = 'ConfigError'
-    this.keys = keys
-  }
-}
+import { ConfigError } from './errors'
 
 export function loadConfig<S extends z.ZodTypeAny>(
   schema: S,
