@@ -18,6 +18,10 @@ export interface FakeOptions {
   failAt?: { step: number; kind: FakeFailKind; times?: number }
   /** Mapa idempotencyKey -> externalId; injetável para simular retomada com outra instância. */
   published?: Map<string, string>
+  /** Contagem de publicações reais por idempotencyKey; injetável. Valor > 1 indica duplicata. */
+  publishCount?: Map<string, number>
+  /** Se 'inconclusive', reconcile sempre devolve `inconclusive`. */
+  reconcileResult?: 'inconclusive'
 }
 
 /**
@@ -47,9 +51,17 @@ function failure(kind: FakeFailKind, step: number): Error {
 
 export function createFakeAdapter(
   opts: FakeOptions = {},
-): PlatformAdapter & { published: Map<string, string> } {
+): PlatformAdapter & { published: Map<string, string>; publishCount: Map<string, number> } {
   const steps = opts.steps ?? 3
+  if (opts.failAt && (opts.failAt.step < 1 || opts.failAt.step > steps)) {
+    throw new RangeError(`failAt.step deve estar entre 1 e ${steps}`)
+  }
   const published = opts.published ?? new Map<string, string>()
+  const publishCount = opts.publishCount ?? new Map<string, number>()
+  const doPublish = (ctx: PublishContext) => {
+    published.set(ctx.idempotencyKey, externalIdOf(ctx))
+    publishCount.set(ctx.idempotencyKey, (publishCount.get(ctx.idempotencyKey) ?? 0) + 1)
+  }
   const failures = new Map<number, number>()
   const externalIdOf = (ctx: PublishContext) => `fake_${ctx.idempotencyKey}`
 
@@ -57,6 +69,7 @@ export function createFakeAdapter(
     id: 'fake',
     mode: 'api',
     published,
+    publishCount,
     capabilities: () => ({
       formats: ['reel', 'short', 'video', 'carousel', 'image'],
       supportsNativeSchedule: false,
@@ -77,6 +90,9 @@ export function createFakeAdapter(
     async publishStep(ctx, progress) {
       const step = stepsDone(progress) + 1
       if (step > steps) {
+        if (!published.has(ctx.idempotencyKey)) {
+          throw new PermanentError('Progress indica conclusão, mas nada foi publicado')
+        }
         return { progress: { step: steps }, done: true, externalId: externalIdOf(ctx) }
       }
       const fail = opts.failAt
@@ -87,18 +103,19 @@ export function createFakeAdapter(
           failures.set(step, count + 1)
           // Timeout após sucesso: a publicação de fato acontece antes do erro.
           if (fail.kind === 'unknown_outcome' && isLast) {
-            published.set(ctx.idempotencyKey, externalIdOf(ctx))
+            doPublish(ctx)
           }
           throw failure(fail.kind, step)
         }
       }
       if (isLast) {
-        published.set(ctx.idempotencyKey, externalIdOf(ctx))
+        doPublish(ctx)
         return { progress: { step }, done: true, externalId: externalIdOf(ctx) }
       }
       return { progress: { step }, done: false }
     },
     async reconcile(ctx) {
+      if (opts.reconcileResult === 'inconclusive') return { status: 'inconclusive' }
       const externalId = published.get(ctx.idempotencyKey)
       return externalId ? { status: 'found', externalId } : { status: 'not_found' }
     },

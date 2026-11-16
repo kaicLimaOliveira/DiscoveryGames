@@ -103,6 +103,35 @@ describe('fake adapter', () => {
     expect(out[1]).toMatchObject({ externalId: 'nope', views: null, likes: null })
   })
 
+  it('caminho normal publica uma vez; retry cego após unknown_outcome duplica de forma observável', async () => {
+    const ok = createFakeAdapter({ steps: 1 })
+    await ok.publishStep(ctx, {})
+    expect(ok.publishCount.get(ctx.idempotencyKey)).toBe(1)
+
+    const a = createFakeAdapter({ steps: 2, failAt: { step: 2, kind: 'unknown_outcome' } })
+    const r1 = await a.publishStep(ctx, {})
+    await expect(a.publishStep(ctx, r1.progress)).rejects.toBeInstanceOf(UnknownOutcomeError)
+    await a.publishStep(ctx, r1.progress) // sem reconcile
+    expect(a.publishCount.get(ctx.idempotencyKey)).toBe(2)
+  })
+
+  it('progress concluído sem publicação real é erro permanente', async () => {
+    const a = createFakeAdapter({ steps: 3, published: new Map() })
+    await expect(a.publishStep(ctx, { step: 3 })).rejects.toBeInstanceOf(PermanentError)
+  })
+
+  it('rejeita failAt fora de 1..steps', () => {
+    expect(() => createFakeAdapter({ steps: 2, failAt: { step: 3, kind: 'auth' } })).toThrow(
+      RangeError,
+    )
+    expect(() => createFakeAdapter({ failAt: { step: 0, kind: 'auth' } })).toThrow(RangeError)
+  })
+
+  it('reconcileResult inconclusive', async () => {
+    const a = createFakeAdapter({ reconcileResult: 'inconclusive' })
+    expect(await a.reconcile(ctx, {})).toEqual({ status: 'inconclusive' })
+  })
+
   it('expõe capacidades, regras e constraints', async () => {
     const a = createFakeAdapter()
     expect(a.id).toBe('fake')
