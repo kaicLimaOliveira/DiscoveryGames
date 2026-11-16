@@ -1,3 +1,7 @@
 export * from './auth/password'
 export * from './auth/totp'
 export * from './auth/rate-limiter'
+export * from './authz/roles'
+export * from './authz/actor'
+export * from './audit'
+export * from './errors'

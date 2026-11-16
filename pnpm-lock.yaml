@@ -38,6 +38,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@central/db':
+        specifier: workspace:*
+        version: link:../db
       '@central/shared':
         specifier: workspace:*
         version: link:../shared
