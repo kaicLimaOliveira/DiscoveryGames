@@ -222,11 +222,14 @@ describe('TOTP', () => {
 describe('senha e permissões', () => {
   it('changePassword incrementa sessionVersion e invalida a senha antiga', async () => {
     const id = await makeMember('cp@x.com', 'editor')
+    const before = (await db!.prisma.user.findUniqueOrThrow({ where: { id } })).sessionVersion
     const r = await svc.changePassword(id, PASSWORD, 'nova-senha-bem-longa')
-    expect(r.sessionVersion).toBe(2)
+    expect(r.sessionVersion).toBe(before + 1)
     const login = (password: string) => svc.login({ email: 'cp@x.com', password, ip: '4.4.4.4' })
     await expect(login(PASSWORD)).rejects.toBeInstanceOf(InvalidCredentialsError)
-    await expect(login('nova-senha-bem-longa')).resolves.toMatchObject({ sessionVersion: 2 })
+    await expect(login('nova-senha-bem-longa')).resolves.toMatchObject({
+      sessionVersion: before + 1,
+    })
   })
 
   it('changePassword exige a senha atual e mínimo de 12 caracteres', async () => {
@@ -303,6 +306,45 @@ describe('senha e permissões', () => {
     await expect(svc.updateUser(admin, GHOST, { name: 'x' })).rejects.toBeInstanceOf(
       ValidationError,
     )
+  })
+})
+
+describe('revogação de sessão ao mudar papel/status', () => {
+  const version = async (id: string) =>
+    (await db!.prisma.user.findUniqueOrThrow({ where: { id } })).sessionVersion
+
+  it('updateUser incrementa sessionVersion ao mudar status ou globalRole, não ao mudar só o nome', async () => {
+    const admin = await makeAdmin()
+    const { id } = await svc.createUser(admin, { email: 'r@x.com', name: 'R', password: PASSWORD })
+    const v0 = await version(id)
+    await svc.updateUser(admin, id, { name: 'Outro' })
+    expect(await version(id)).toBe(v0)
+    await svc.updateUser(admin, id, { globalRole: 'admin' })
+    expect(await version(id)).toBe(v0 + 1)
+    await svc.updateUser(admin, id, { status: 'disabled' })
+    expect(await version(id)).toBe(v0 + 2)
+    await svc.updateUser(admin, id, { status: 'active' })
+    expect(await version(id)).toBe(v0 + 3)
+    // Valor igual ao atual não é mudança.
+    await svc.updateUser(admin, id, { status: 'active', globalRole: 'admin' })
+    expect(await version(id)).toBe(v0 + 3)
+  })
+
+  it('setMembership incrementa sessionVersion do alvo ao criar, alterar e remover vínculo', async () => {
+    const admin = await makeAdmin()
+    const { id } = await svc.createUser(admin, { email: 's@x.com', name: 'S', password: PASSWORD })
+    const brand = await db!.prisma.brand.create({ data: { name: 'B', slug: 'b-s' } })
+    const v0 = await version(id)
+    await svc.setMembership(admin, brand.id, id, 'editor')
+    expect(await version(id)).toBe(v0 + 1)
+    await svc.setMembership(admin, brand.id, id, 'approver')
+    expect(await version(id)).toBe(v0 + 2)
+    await svc.setMembership(admin, brand.id, id, null)
+    expect(await version(id)).toBe(v0 + 3)
+    // Remover vínculo inexistente não muda nada.
+    await svc.setMembership(admin, brand.id, id, null)
+    expect(await version(id)).toBe(v0 + 3)
+    expect(await version(admin.id)).toBe(1)
   })
 })
 

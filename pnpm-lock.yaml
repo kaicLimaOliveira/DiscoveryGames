@@ -81,6 +81,9 @@ importers:
       '@testcontainers/postgresql':
         specifier: 12.2.1
         version: 12.2.1(bare-buffer@3.7.2)
+      iron-webcrypto:
+        specifier: 1.2.1
+        version: 1.2.1
       otpauth:
         specifier: 9.6.0
         version: 9.6.0

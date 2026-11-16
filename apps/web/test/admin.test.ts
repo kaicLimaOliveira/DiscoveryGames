@@ -196,4 +196,55 @@ describe('administração de usuários', () => {
     expect((await session.request('/api/admin/users')).status).toBe(401)
     expect(session.cookie).toBeUndefined()
   })
+
+  it('promoção a approver durante a sessão revoga o cookie (novo login exige 2FA)', async () => {
+    const editor = await createUser({
+      prefix: 'promovido',
+      memberships: [{ brandId, role: 'editor' }],
+    })
+    const session = await loggedIn(editor)
+    expect((await session.request('/api/admin/users')).status).toBe(403)
+
+    const res = await clients.admin.request(`/api/admin/brands/${brandId}/members/${editor.id}`, {
+      method: 'PUT',
+      body: { role: 'approver' },
+    })
+    expect(res.status).toBe(204)
+    expect((await session.request('/api/admin/users')).status).toBe(401)
+
+    const relogin = await new Client().login(editor.email, editor.password)
+    expect(relogin.body).toEqual({ stage: 'totp_enroll' })
+  })
+
+  it('promoção a admin global durante a sessão → 401, não 200', async () => {
+    const editor = await createUser({
+      prefix: 'promovido-admin',
+      memberships: [{ brandId, role: 'editor' }],
+    })
+    const session = await loggedIn(editor)
+    const res = await clients.admin.request(`/api/admin/users/${editor.id}`, {
+      method: 'PATCH',
+      body: { globalRole: 'admin' },
+    })
+    expect(res.status).toBe(204)
+    expect((await session.request('/api/admin/users')).status).toBe(401)
+  })
+
+  it('desativar e reativar não revive o cookie antigo', async () => {
+    const user = await createUser({
+      prefix: 'reativado',
+      memberships: [{ brandId, role: 'editor' }],
+    })
+    const old = await loggedIn(user)
+    for (const status of ['disabled', 'active']) {
+      const res = await clients.admin.request(`/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        body: { status },
+      })
+      expect(res.status).toBe(204)
+    }
+    expect((await old.request('/api/admin/users')).status).toBe(401)
+    // Um novo login funciona normalmente.
+    expect((await (await loggedIn(user)).request('/api/admin/users')).status).toBe(403)
+  })
 })

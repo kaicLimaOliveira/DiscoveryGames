@@ -26,6 +26,7 @@
     "@nuxt/test-utils": "4.4.0",
     "@testcontainers/minio": "12.2.1",
     "@testcontainers/postgresql": "12.2.1",
+    "iron-webcrypto": "1.2.1",
     "otpauth": "9.6.0",
     "vue-tsc": "3.3.14"
   }

@@ -2,13 +2,25 @@
  * O Nitro troca `import.meta` por `globalThis._importMeta_`, cuja `url` nos chunks é
  * "file:///_entry.js" (sem unidade de disco no Windows). O cliente Prisma gerado faz
  * `fileURLToPath(import.meta.url)` ao carregar; aqui volta a usar a URL real do chunk ESM.
+ *
+ * Se o Nitro ou o Prisma mudarem o código gerado, o build falha (em vez de quebrar só em
+ * runtime no Windows): o chunk com o cliente Prisma precisa conter o padrão esperado.
  */
+const PRISMA_MARKER = 'getPrismaClient('
+const IMPORT_META_FROM = 'fileURLToPath(globalThis._importMeta_.url)'
+const IMPORT_META_TO = 'fileURLToPath(import.meta.url)'
+
 const prismaImportMetaUrl = {
   name: 'central:prisma-import-meta-url',
-  renderChunk(code: string) {
-    const from = 'fileURLToPath(globalThis._importMeta_.url)'
-    if (!code.includes(from)) return null
-    return { code: code.replaceAll(from, 'fileURLToPath(import.meta.url)'), map: null }
+  renderChunk(code: string, chunk: { fileName: string }) {
+    if (!code.includes(PRISMA_MARKER)) return null
+    if (!code.includes(IMPORT_META_FROM)) {
+      throw new Error(
+        `[central:prisma-import-meta-url] padrão "${IMPORT_META_FROM}" não encontrado no ` +
+          `chunk do Prisma (${chunk.fileName}); revise o patch.`,
+      )
+    }
+    return { code: code.replaceAll(IMPORT_META_FROM, IMPORT_META_TO), map: null }
   },
 }
 

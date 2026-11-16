@@ -77,6 +77,11 @@ function maskEmail(email: string): string {
   return `${email[0]}***@${email.slice(at + 1)}`
 }
 
+/** Vínculos mudam o 2FA exigido: força novo login, que recalcula o estágio. */
+async function revokeSessions(tx: Tx, userId: string): Promise<void> {
+  await tx.user.update({ where: { id: userId }, data: { sessionVersion: { increment: 1 } } })
+}
+
 /** Trava os admins ativos até o fim da transação (evita corrida no "último admin"). */
 async function lockActiveAdmins(tx: Tx): Promise<void> {
   await tx.$queryRaw`SELECT id FROM "User" WHERE role = 'admin' AND status = 'active' FOR UPDATE`
@@ -296,7 +301,13 @@ export function createIdentityService(deps: {
         if (i.status !== undefined) data.status = i.status
         if (i.globalRole !== undefined) data.role = i.globalRole
         if (i.name !== undefined) data.name = i.name.trim()
-        await tx.user.update({ where: { id: userId }, data })
+        // Mudar status ou papel global revoga as sessões abertas: o novo login recalcula o
+        // estágio (2FA obrigatório) e um usuário reativado não reaproveita cookies antigos.
+        const revoke = status !== target.status || role !== target.role
+        await tx.user.update({
+          where: { id: userId },
+          data: revoke ? { ...data, sessionVersion: { increment: 1 } } : data,
+        })
         await writeAudit(tx, {
           action: 'user.updated',
           entityType: 'user',
@@ -318,6 +329,7 @@ export function createIdentityService(deps: {
         if (role === null) {
           const { count } = await tx.brandMember.deleteMany({ where: { brandId, userId } })
           if (count === 0) return
+          await revokeSessions(tx, userId)
           await writeAudit(tx, {
             action: 'member.removed',
             entityType: 'brand_member',
@@ -332,6 +344,7 @@ export function createIdentityService(deps: {
           create: { brandId, userId, role },
           update: { role },
         })
+        await revokeSessions(tx, userId)
         await writeAudit(tx, {
           action: 'member.upserted',
           entityType: 'brand_member',

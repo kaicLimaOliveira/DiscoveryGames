@@ -6,6 +6,7 @@ import {
   createUser,
   db,
   loggedIn,
+  env,
   nextTotpCode,
   setupServer,
   uniqueEmail,
@@ -13,6 +14,7 @@ import {
   type TestUser,
 } from './helpers'
 import { Secret, TOTP } from 'otpauth'
+import { defaults as ironDefaults, seal, unseal } from 'iron-webcrypto'
 
 await setupServer()
 
@@ -193,7 +195,64 @@ describe('segundo fator', () => {
   })
 })
 
+// Mesmo selo do h3 1.x (useSession): iron com ttl = maxAge.
+const SEAL_OPTS = { ...ironDefaults, ttl: 12 * 3600 * 1000 }
+interface SealedSession {
+  id: string
+  createdAt: number
+  data: { user: { id: string }; secure: { lastSeenAt: number; sessionVersion: number } }
+}
+const unsealCookie = async (cookie: string) =>
+  (await unseal(globalThis.crypto, cookie, env.NUXT_SESSION_PASSWORD!, SEAL_OPTS)) as SealedSession
+const sealCookie = (session: SealedSession) =>
+  seal(globalThis.crypto, session, env.NUXT_SESSION_PASSWORD!, SEAL_OPTS)
+
 describe('sessão', () => {
+  it('lastSeenAt com mais de 5 min: o middleware regrava a sessão; recente: não regrava', async () => {
+    const client = await loggedIn(editor)
+    const fresh = await client.request('/api/admin/users')
+    expect(fresh.status).toBe(403)
+    expect(fresh.headers.getSetCookie().some((c) => c.startsWith('central-session='))).toBe(false)
+
+    const session = await unsealCookie(client.cookie!)
+    const stale = Date.now() - 6 * 60_000
+    session.data.secure.lastSeenAt = stale
+    client.cookie = await sealCookie(session)
+
+    const res = await client.request('/api/admin/users')
+    expect(res.status).toBe(403)
+    expect(res.headers.getSetCookie().some((c) => c.startsWith('central-session='))).toBe(true)
+    const renewed = await unsealCookie(client.cookie!)
+    expect(renewed.data.secure.lastSeenAt).toBeGreaterThan(Date.now() - 60_000)
+    expect(renewed.createdAt).toBeGreaterThanOrEqual(session.createdAt)
+    expect(renewed.data.secure.sessionVersion).toBe(session.data.secure.sessionVersion)
+  })
+
+  it('/api/_auth/session: sessão válida devolve o usuário sem secure; revogada devolve {} e limpa o cookie', async () => {
+    const user = await createUser({
+      prefix: 'auth-utils',
+      memberships: [{ brandId, role: 'editor' }],
+    })
+    const client = await loggedIn(user)
+    const ok = await client.request('/api/_auth/session')
+    expect(ok.status).toBe(200)
+    expect((ok.body as { user: { id: string; stage: string } }).user).toMatchObject({
+      id: user.id,
+      stage: 'full',
+    })
+    expect(ok.body).not.toHaveProperty('secure')
+
+    await db.user.update({ where: { id: user.id }, data: { status: 'disabled' } })
+    const revoked = await client.request('/api/_auth/session')
+    expect(revoked.status).toBe(200)
+    expect(revoked.body ?? {}).toEqual({})
+    expect(client.cookie).toBeUndefined()
+
+    const anonymous = await new Client().request('/api/_auth/session')
+    expect(anonymous.status).toBe(200)
+    expect(anonymous.body ?? {}).not.toHaveProperty('user')
+  })
+
   it('sem cookie → 401', async () => {
     expect((await new Client().request('/api/admin/users')).status).toBe(401)
   })
