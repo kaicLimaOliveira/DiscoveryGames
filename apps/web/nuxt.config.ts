@@ -109,6 +109,9 @@ export default defineNuxtConfig({
       config.errorHandler = ['~~/server/error', ...nuxtHandlers]
     },
     'nitro:init'(nitro) {
+      // Os patches são só do build de produção (no dev o bundle é outro e a asserção obrigatória
+      // derrubaria o servidor).
+      if (nitro.options.dev) return
       nitro.hooks.hook('rollup:before', (_nitro, config) => {
         const plugins = Array.isArray(config.plugins) ? config.plugins : [config.plugins]
         config.plugins = [...plugins, createNitroPatches()]
