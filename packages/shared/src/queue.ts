@@ -7,6 +7,7 @@ export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
 
 export interface SendOptions {
   db?: SqlExecutor
+  /** Dedupes only on queues with a keyed policy (e.g. `exclusive`); ignored by `standard` queues. */
   singletonKey?: string
   startAfter?: Date
 }

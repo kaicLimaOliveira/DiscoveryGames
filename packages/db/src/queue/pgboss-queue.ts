@@ -18,8 +18,16 @@ export function sqlExecutorFor(tx: Tx): SqlExecutor {
   }
 }
 
-/** Dedup window for sends carrying a singletonKey. */
-const SINGLETON_WINDOW_SECONDS = 3600
+export type QueuePolicy = 'standard' | 'short' | 'exclusive' | 'stately'
+
+/**
+ * pg-boss policy per queue. `singletonKey` only dedupes on keyed policies:
+ * `exclusive` = one queued-or-active job per key, `short` = one queued job per key.
+ * The future `publish` queue will be `exclusive`.
+ */
+export const QUEUE_POLICIES: Record<QueueName, QueuePolicy> = {
+  [QUEUES.systemEcho]: 'standard',
+}
 
 export interface PgBossQueue extends JobQueue {
   work<T>(
@@ -34,6 +42,10 @@ export interface PgBossQueue extends JobQueue {
 export async function createPgBossQueue(opts: {
   connectionString: string
   role: 'web' | 'worker'
+  /** Receives pg-boss background 'error' events. Defaults to console.error (never swallowed). */
+  onError?: (err: Error) => void
+  /** Test-only hook: extra queues (outside QUEUES) created with the given policy. */
+  extraQueues?: Array<{ name: string; policy: QueuePolicy }>
 }): Promise<PgBossQueue> {
   const isWorker = opts.role === 'worker'
   const boss = new PgBoss({
@@ -44,12 +56,14 @@ export async function createPgBossQueue(opts: {
     schedule: isWorker,
     migrate: isWorker,
   })
-  boss.on('error', () => {
-    // Surfaced by failing calls; the listener keeps pg-boss errors from crashing the process.
-  })
+  const onError = opts.onError ?? ((err: Error) => console.error('[pg-boss]', err))
+  boss.on('error', onError)
   await boss.start()
   try {
-    for (const name of Object.values(QUEUES)) await boss.createQueue(name)
+    for (const name of Object.values(QUEUES)) {
+      await boss.createQueue(name, { policy: QUEUE_POLICIES[name] })
+    }
+    for (const q of opts.extraQueues ?? []) await boss.createQueue(q.name, { policy: q.policy })
   } catch (err) {
     await boss.stop({ graceful: false })
     throw err
@@ -59,10 +73,7 @@ export async function createPgBossQueue(opts: {
     send(name, data, sendOpts?: SendOptions) {
       return boss.send(name, data, {
         ...(sendOpts?.db ? { db: sendOpts.db } : {}),
-        // pg-boss only dedupes a singletonKey inside a time slot (singletonSeconds) on standard queues.
-        ...(sendOpts?.singletonKey
-          ? { singletonKey: sendOpts.singletonKey, singletonSeconds: SINGLETON_WINDOW_SECONDS }
-          : {}),
+        ...(sendOpts?.singletonKey ? { singletonKey: sendOpts.singletonKey } : {}),
         ...(sendOpts?.startAfter ? { startAfter: sendOpts.startAfter } : {}),
       })
     },
