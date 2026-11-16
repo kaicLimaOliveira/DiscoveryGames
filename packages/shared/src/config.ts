@@ -18,7 +18,7 @@ export function loadConfig<S extends z.ZodTypeAny>(
 }
 
 /** Variável opcional: string vazia (ex.: `VAR: ${VAR:-}` no compose) vale como não definida. */
-const emptyAsUnset = (v: unknown) => (v === '' ? undefined : v)
+export const emptyAsUnset = (v: unknown) => (v === '' ? undefined : v)
 
 export const baseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),

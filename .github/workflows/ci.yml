@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
 
 permissions:
@@ -61,3 +63,12 @@ jobs:
           retention-days: 7
 
       - run: scripts/smoke.sh
+
+  # Publica as imagens só depois do CI verde, em main e em tags v*, reaproveitando este run.
+  images:
+    needs: [ci]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    uses: ./.github/workflows/images.yml
+    permissions:
+      contents: read
+      packages: write

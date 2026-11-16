@@ -85,8 +85,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       APP_ORIGIN: ${APP_ORIGIN}
       NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD}
-      TOTP_ISSUER: ${TOTP_ISSUER}
-      TRUST_PROXY: ${TRUST_PROXY}
+      TOTP_ISSUER: ${TOTP_ISSUER:-Central de Conteúdo}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
       APP_ENCRYPTION_KEYS: ${APP_ENCRYPTION_KEYS}
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1

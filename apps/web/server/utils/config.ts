@@ -1,4 +1,10 @@
-import { baseEnvSchema, cryptoEnvSchema, loadConfig, storageEnvSchema } from '@central/shared'
+import {
+  baseEnvSchema,
+  cryptoEnvSchema,
+  emptyAsUnset,
+  loadConfig,
+  storageEnvSchema,
+} from '@central/shared'
 import { z } from 'zod'
 
 export const webEnvSchema = baseEnvSchema
@@ -8,12 +14,15 @@ export const webEnvSchema = baseEnvSchema
     APP_ORIGIN: z.url().transform((v) => new URL(v).origin),
     // Consumida pelo nuxt-auth-utils para selar o cookie; validada aqui para falhar cedo.
     NUXT_SESSION_PASSWORD: z.string().min(32),
-    TOTP_ISSUER: z.string().min(1).default('Central de Conteúdo'),
+    TOTP_ISSUER: z.preprocess(emptyAsUnset, z.string().min(1).default('Central de Conteúdo')),
     // Atrás do Caddy o IP do cliente vem em X-Forwarded-For.
-    TRUST_PROXY: z
-      .enum(['true', 'false'])
-      .default('false')
-      .transform((v) => v === 'true'),
+    TRUST_PROXY: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(['true', 'false'])
+        .default('false')
+        .transform((v) => v === 'true'),
+    ),
   })
 
 export type WebConfig = z.infer<typeof webEnvSchema>

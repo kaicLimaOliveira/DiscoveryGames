@@ -21,7 +21,7 @@ Deploy da Central de Conteúdo em uma VPS (Hetzner CPX32, Ubuntu LTS) com as ima
    ```
 3. Atualizações de segurança automáticas: `sudo apt install unattended-upgrades` e `sudo dpkg-reconfigure -plow unattended-upgrades`.
 4. Instalar Docker Engine e o plugin Compose (repositório oficial da Docker) e adicionar o usuário ao grupo `docker`.
-5. Criar `/opt/central` e copiar para lá `compose.prod.yaml` e `Caddyfile` do repositório (a pasta `docker/` não é necessária: as imagens já vêm prontas).
+5. Criar `/opt/central` e copiar para lá `compose.prod.yaml`, `Caddyfile` e `.env.example` do repositório (a pasta `docker/` não é necessária: as imagens já vêm prontas).
 
 ## 3. Login no GHCR
 
@@ -64,7 +64,9 @@ docker compose -f compose.prod.yaml --env-file .env run --rm migrate
 docker compose -f compose.prod.yaml --env-file .env up -d --wait
 ```
 
-**Backup antes de migrar** (mínimo): `docker compose -f compose.prod.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB" > /opt/central/backup-$(date +%F-%H%M).dump`. Guardar uma cópia fora da VPS.
+**Backup antes de migrar** (mínimo): `docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backup-$(date +%F-%H%M).dump` (o `sh -c` roda dentro do container, onde as variáveis existem). Guardar uma cópia fora da VPS.
+
+**Restore** (mínimo): com os serviços parados exceto o `postgres`, `docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < backup-<data>.dump`.
 
 ## 6. Primeiro administrador
 
