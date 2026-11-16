@@ -1,0 +1,110 @@
+# Produção: imagens do registry, sem MinIO (R2 via S3_*); só o Caddy publica 80/443.
+# Uso: `docker compose -f compose.prod.yaml --env-file .env up -d --wait`
+name: central
+
+x-db-url: &db-url postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+x-hardened: &hardened
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  postgres:
+    image: postgres@sha256:e6a4209d1a4893f2df3bdcde58f8926c3c929c4d51df90990ed1b36d83c1382a # postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: ghcr.io/${IMAGE_OWNER}/central-migrate:${IMAGE_TAG}
+    environment:
+      DATABASE_URL: *db-url
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    <<: *hardened
+    image: ghcr.io/${IMAGE_OWNER}/central-worker:${IMAGE_TAG}
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: *db-url
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    <<: *hardened
+    image: ghcr.io/${IMAGE_OWNER}/central-web:${IMAGE_TAG}
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: *db-url
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      APP_ORIGIN: ${APP_ORIGIN}
+      NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD}
+      TOTP_ISSUER: ${TOTP_ISSUER}
+      TRUST_PROXY: 'true'
+      APP_ENCRYPTION_KEYS: ${APP_ENCRYPTION_KEYS}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health').then(()=>process.exit(0),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      worker:
+        condition: service_started
+
+  caddy:
+    image: caddy@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0 # caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      PANEL_DOMAIN: ${PANEL_DOMAIN:?defina o domínio do painel}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

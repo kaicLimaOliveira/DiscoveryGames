@@ -1,0 +1,11 @@
+# Dev: PANEL_DOMAIN não definido -> http://localhost (porta 80, sem TLS).
+# Prod: PANEL_DOMAIN=painel.exemplo.com -> TLS automático (Let's Encrypt).
+{$PANEL_DOMAIN:http://localhost} {
+	encode zstd gzip
+
+	reverse_proxy web:3000 {
+		# Sem `trusted_proxies`: o Caddy NÃO confia em X-Forwarded-For vindo do cliente e o
+		# sobrescreve com o IP real da conexão (o web usa esse cabeçalho no limite de login).
+		header_up X-Forwarded-For {remote_host}
+	}
+}
