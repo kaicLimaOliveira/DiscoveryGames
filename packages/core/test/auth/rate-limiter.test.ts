@@ -66,4 +66,37 @@ describe('login rate limiter', () => {
     for (let i = 0; i < 5; i++) rl.recordFailure(['k'])
     expect(rl.retryAfterMs(['k'])).toBeGreaterThan(0)
   })
+
+  it('1000 falhas em uma chave: espera continua correta', () => {
+    let t = 0
+    const rl = createLoginRateLimiter({ now: () => t })
+    for (let i = 0; i < 1000; i++) {
+      rl.recordFailure(['k'])
+      t += 10
+    }
+    // últimas 5 falhas em t=9950..9990; a que completa o limite é a de 9950
+    expect(rl.retryAfterMs(['k'])).toBe(9950 + 15 * MIN - t)
+  })
+
+  it('varre chaves expiradas e o tamanho encolhe', () => {
+    let t = 0
+    const rl = createLoginRateLimiter({ now: () => t })
+    for (let i = 0; i < 50; i++) rl.recordFailure([`ip:${i}`])
+    expect(rl.size()).toBe(50)
+    t += 15 * MIN
+    for (let i = 0; i < 100; i++) rl.recordFailure(['fresh'])
+    expect(rl.size()).toBe(1)
+  })
+
+  it('respeita o teto de chaves descartando as mais antigas', () => {
+    let t = 0
+    const rl = createLoginRateLimiter({ maxKeys: 10, max: 1, now: () => t })
+    for (let i = 0; i < 30; i++) {
+      rl.recordFailure([`k${i}`])
+      t += 1
+    }
+    expect(rl.size()).toBe(10)
+    expect(rl.retryAfterMs(['k29'])).toBeGreaterThan(0)
+    expect(rl.retryAfterMs(['k0'])).toBe(0)
+  })
 })

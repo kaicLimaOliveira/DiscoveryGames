@@ -33,6 +33,7 @@ describe('totp', () => {
     expect(verifyTotp(secret, code, null, now).ok).toBe(true)
     expect(verifyTotp(secret, code, null, new Date(now.getTime() + 30_000)).ok).toBe(true)
     expect(verifyTotp(secret, code, null, new Date(now.getTime() - 30_000)).ok).toBe(true)
+    expect(verifyTotp(secret, code, null, new Date(now.getTime() + 60_000)).ok).toBe(false)
     expect(verifyTotp(secret, code, null, new Date(now.getTime() + 90_000)).ok).toBe(false)
   })
 
@@ -62,6 +63,12 @@ describe('totp', () => {
     for (const bad of ['', '12345', '1234567', 'abcdef', '12 456', '１２３４５６']) {
       expect(verifyTotp(secret, bad, null, now)).toEqual({ ok: false })
     }
+  })
+
+  it('retorna ok:false (sem lançar) para segredo malformado ou data inválida', () => {
+    expect(verifyTotp('!!!não-base32!!!', '123456', null, now)).toEqual({ ok: false })
+    const secret = generateTotpSecret()
+    expect(verifyTotp(secret, '123456', null, new Date(NaN))).toEqual({ ok: false })
   })
 
   it('usa o relógio atual por padrão', () => {

@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto'
 import { Secret, TOTP } from 'otpauth'
 
 const PERIOD_S = 30
@@ -17,7 +16,7 @@ function totpFor(secret: string, label = 'OTPAuth', issuer = ''): TOTP {
 
 /** Segredo TOTP de 20 bytes, em base32. */
 export function generateTotpSecret(): string {
-  return new Secret({ buffer: randomBytes(20).buffer as ArrayBuffer }).base32
+  return new Secret({ size: 20 }).base32
 }
 
 export function totpUri(secret: string, label: string, issuer: string): string {
@@ -36,7 +35,14 @@ export function verifyTotp(
 ): { ok: true; step: bigint } | { ok: false } {
   if (!/^[0-9]{6}$/.test(code)) return { ok: false }
   const timestamp = now.getTime()
-  const delta = totpFor(secret).validate({ token: code, timestamp, window: 1 })
+  if (!Number.isFinite(timestamp)) return { ok: false }
+  let delta: number | null
+  try {
+    delta = totpFor(secret).validate({ token: code, timestamp, window: 1 })
+  } catch {
+    // Segredo base32 malformado: tratar como código inválido.
+    return { ok: false }
+  }
   if (delta === null) return { ok: false }
   const step = BigInt(Math.floor(timestamp / PERIOD_MS) + delta)
   if (lastUsedStep !== null && step <= lastUsedStep) return { ok: false }
