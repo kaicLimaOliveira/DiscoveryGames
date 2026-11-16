@@ -1,0 +1,26 @@
+{
+  "name": "@central/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "postinstall": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "12.2.1",
+    "prisma": "7.10.1"
+  }
+}
