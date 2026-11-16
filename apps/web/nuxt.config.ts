@@ -19,32 +19,56 @@ const IMPORT_META_TO = 'fileURLToPath(import.meta.url)'
 const ASSET_MARKER = 'function readAsset'
 const ASSET_FROM = 'const serverDir = dirname(fileURLToPath(globalThis._importMeta_.url));'
 
-const prismaImportMetaUrl = {
-  name: 'central:prisma-import-meta-url',
-  renderChunk(code: string, chunk: { fileName: string }) {
-    if (code.includes(ASSET_MARKER)) {
-      if (!code.includes(ASSET_FROM)) {
-        throw new Error(
-          `[central:prisma-import-meta-url] padrão do leitor de assets não encontrado no chunk ` +
-            `(${chunk.fileName}); revise o patch.`,
+/**
+ * Reproduzido também no Linux (node:24-slim): sem este patch `/_nuxt/*` responde 404;
+ * não é um problema só do Windows.
+ */
+function createNitroPatches() {
+  let assetPatched = false
+  let prismaPatched = false
+  return {
+    name: 'central:nitro-patches',
+    renderChunk(code: string, chunk: { fileName: string }) {
+      let out = code
+      if (out.includes(ASSET_MARKER)) {
+        if (!out.includes(ASSET_FROM)) {
+          throw new Error(
+            `[central:nitro-patches] padrão do leitor de assets não encontrado no chunk ` +
+              `(${chunk.fileName}); revise o patch.`,
+          )
+        }
+        // Sobe da pasta do chunk (ex.: chunks/nitro/) até server/; na raiz, './' (nunca '').
+        const up = '../'.repeat(chunk.fileName.split('/').length - 1) || './'
+        out = out.replace(
+          ASSET_FROM,
+          `const serverDir = fileURLToPath(new URL(${JSON.stringify(up)}, import.meta.url));`,
         )
+        assetPatched = true
       }
-      // Sobe da pasta do chunk (ex.: chunks/_/) até server/.
-      const up = '../'.repeat(chunk.fileName.split('/').length - 1)
-      code = code.replace(
-        ASSET_FROM,
-        `const serverDir = fileURLToPath(new URL(${JSON.stringify(up)}, import.meta.url));`,
-      )
-    }
-    if (!code.includes(PRISMA_MARKER)) return { code, map: null }
-    if (!code.includes(IMPORT_META_FROM)) {
-      throw new Error(
-        `[central:prisma-import-meta-url] padrão "${IMPORT_META_FROM}" não encontrado no ` +
-          `chunk do Prisma (${chunk.fileName}); revise o patch.`,
-      )
-    }
-    return { code: code.replaceAll(IMPORT_META_FROM, IMPORT_META_TO), map: null }
-  },
+      if (out.includes(PRISMA_MARKER)) {
+        if (!out.includes(IMPORT_META_FROM)) {
+          throw new Error(
+            `[central:nitro-patches] padrão "${IMPORT_META_FROM}" não encontrado no ` +
+              `chunk do Prisma (${chunk.fileName}); revise o patch.`,
+          )
+        }
+        out = out.replaceAll(IMPORT_META_FROM, IMPORT_META_TO)
+        prismaPatched = true
+      }
+      return out === code ? null : { code: out, map: null }
+    },
+    // Os dois patches são obrigatórios: se o Nitro/Prisma mudarem a ponto de o padrão nem
+    // aparecer, o build falha em vez de gerar um servidor quebrado (assets 404 / Prisma).
+    generateBundle() {
+      const missing = [
+        ...(assetPatched ? [] : ['leitor de assets do Nitro (readAsset)']),
+        ...(prismaPatched ? [] : ['cliente Prisma (getPrismaClient)']),
+      ]
+      if (missing.length) {
+        throw new Error(`[central:nitro-patches] patch não aplicado: ${missing.join(', ')}.`)
+      }
+    },
+  }
 }
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -87,7 +111,7 @@ export default defineNuxtConfig({
     'nitro:init'(nitro) {
       nitro.hooks.hook('rollup:before', (_nitro, config) => {
         const plugins = Array.isArray(config.plugins) ? config.plugins : [config.plugins]
-        config.plugins = [...plugins, prismaImportMetaUrl]
+        config.plugins = [...plugins, createNitroPatches()]
       })
     },
   },
