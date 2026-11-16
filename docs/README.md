@@ -38,6 +38,7 @@
 | — | Originalidade e políticas | [18-originalidade-e-politicas.md](18-originalidade-e-politicas.md) |
 | — | Painel administrativo (telas) | [19-painel-administrativo.md](19-painel-administrativo.md) |
 | — | Monetização (programas, requisitos, impacto no projeto) | [20-monetizacao.md](20-monetizacao.md) |
+| — | Deploy na VPS (runbook) | [runbooks/deploy.md](runbooks/deploy.md) |
 | — | Planos de implementação | [superpowers/plans/](superpowers/plans/) |
 | — | Decisões (ADRs) | [adr/](adr/) |
 | — | Fontes de preços | [_pesquisa/custos-infra-fontes.md](_pesquisa/custos-infra-fontes.md) |

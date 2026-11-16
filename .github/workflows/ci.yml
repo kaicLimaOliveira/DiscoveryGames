@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # A versão do pnpm vem do campo packageManager do package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Formatação (prettier --check)
+        run: pnpm format
+
+      # core e platforms rodam com cobertura: os limites de 80% (vitest.config de cada pacote)
+      # falham o passo se não forem atingidos. Os demais pacotes rodam sem cobertura, para não
+      # executar nenhuma suíte duas vezes. O Testcontainers usa o Docker do runner.
+      - name: Testes com cobertura (core, platforms)
+        run: pnpm --filter @central/core --filter @central/platforms test:coverage
+      - name: Testes (shared, db, storage, worker)
+        run: >-
+          pnpm --filter @central/shared --filter @central/db --filter @central/storage
+          --filter @central/worker test
+      - run: pnpm test:web
+
+      - name: Instalar o Chromium do Playwright
+        run: pnpm --filter @central/web exec playwright install --with-deps chromium
+      - name: E2E (Playwright)
+        run: pnpm test:e2e --reporter=list,html
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+      - name: Relatório do Playwright
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - run: scripts/smoke.sh
