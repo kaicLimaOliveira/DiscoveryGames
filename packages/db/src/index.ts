@@ -9,3 +9,6 @@ export type {
   AuditLog,
   Heartbeat,
 } from './generated/prisma/client.js'
+export { createPgBossQueue, sqlExecutorFor } from './queue/pgboss-queue.js'
+export type { PgBossQueue } from './queue/pgboss-queue.js'
+export { recordHeartbeat, readHeartbeat } from './heartbeat.js'
