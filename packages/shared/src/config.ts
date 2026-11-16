@@ -17,11 +17,14 @@ export function loadConfig<S extends z.ZodTypeAny>(
   return result.data
 }
 
+/** Variável opcional: string vazia (ex.: `VAR: ${VAR:-}` no compose) vale como não definida. */
+const emptyAsUnset = (v: unknown) => (v === '' ? undefined : v)
+
 export const baseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.string().min(1).default('info'),
   DATABASE_URL: z.url(),
-  SENTRY_DSN: z.string().min(1).optional(),
+  SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
 })
 
 export const storageEnvSchema = z.object({

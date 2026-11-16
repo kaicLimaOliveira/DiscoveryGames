@@ -26,15 +26,21 @@ RUN pnpm --filter @central/db generate \
  && cd /out/node_modules/.pnpm \
  && rm -rf /out/node_modules/@central prisma@* @prisma+studio-core@* @prisma+dev@* typescript@* effect@* @electric-sql+pglite@*
 
-# Só roda `prisma migrate deploy` (usa a CLI do prisma, devDependency do @central/db).
-FROM build AS migrate
+# Só roda `prisma migrate deploy`: imagem enxuta com a CLI do prisma (versão fixada, igual à do
+# lockfile) e o diretório prisma/ do @central/db; não parte do estágio `build`.
+FROM node:24-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS migrate
 # O schema engine do Prisma precisa do OpenSSL (ausente no node:24-slim).
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
  && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
-WORKDIR /repo/packages/db
-# Baixa o schema engine (OpenSSL 3) no build: o usuário node não pode gravar em node_modules.
-RUN ./node_modules/.bin/prisma -v
+WORKDIR /app
+RUN echo '{"name":"migrate","private":true,"dependencies":{"prisma":"7.10.1"}}' > package.json \
+ && npm install --omit=dev --no-audit --no-fund \
+ # Baixa o schema engine (OpenSSL 3) no build: o usuário node não pode gravar em node_modules.
+ && ./node_modules/.bin/prisma -v \
+ && rm -rf /root/.npm /root/.cache /tmp/*
+COPY packages/db/prisma.config.ts ./
+COPY packages/db/prisma ./prisma
 USER node
 CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 

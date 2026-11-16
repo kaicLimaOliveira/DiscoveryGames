@@ -25,7 +25,7 @@ compose up -d --build --wait --wait-timeout 300
 echo "==> aguardando /api/health via Caddy (ate 60 s)"
 ok=0
 for _ in $(seq 1 60); do
-  if body=$(curl -fsS http://localhost/api/health 2>/dev/null) && echo "$body" | grep -q '"status":"ok"'; then
+  if body=$(curl -fsS -m 5 http://localhost/api/health 2>/dev/null) && echo "$body" | grep -q '"status":"ok"'; then
     echo "$body"
     ok=1
     break

@@ -9,6 +9,13 @@ describe('loadConfig', () => {
     expect(c.NODE_ENV).toBe('development')
     expect(c.LOG_LEVEL).toBe('info')
   })
+  it('SENTRY_DSN vazio vale como não definido', () => {
+    const base = { DATABASE_URL: 'postgres://u:p@h:5432/d' }
+    expect(loadConfig(baseEnvSchema, { ...base, SENTRY_DSN: '' }).SENTRY_DSN).toBeUndefined()
+    expect(
+      loadConfig(baseEnvSchema, { ...base, SENTRY_DSN: 'https://k@o.example/1' }).SENTRY_DSN,
+    ).toBe('https://k@o.example/1')
+  })
   it('lista nomes inválidos sem vazar valores', () => {
     try {
       loadConfig(baseEnvSchema, { DATABASE_URL: 'segredo-nao-url' })

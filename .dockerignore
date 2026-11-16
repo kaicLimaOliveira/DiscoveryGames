@@ -8,8 +8,8 @@
 **/playwright-report
 **/*.tsbuildinfo
 .git
-.env
-.env.*
-!.env.example
+**/.env
+**/.env.*
+!**/.env.example
 .superpowers
 docs
