@@ -31,15 +31,35 @@ export const REDACT_PATHS: string[] = SECRET_NAMES.flatMap((name) => [
 const CENSOR = '[REDACTED]'
 const SIGNATURE_RE = /(X-Amz-Signature=)[^&\s"']*/gi
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object') return false
+  const proto = Object.getPrototypeOf(value) as unknown
+  return proto === Object.prototype || proto === null
+}
+
+function scrubString(value: string): string {
+  return value.replace(SIGNATURE_RE, `$1${CENSOR}`)
+}
+
 function scrub(value: unknown, depth: number): unknown {
-  if (typeof value === 'string') return value.replace(SIGNATURE_RE, `$1${CENSOR}`)
-  if (depth > 0 && value !== null && typeof value === 'object' && !(value instanceof Error)) {
-    if (Array.isArray(value)) return value.map((v) => scrub(v, depth - 1))
+  if (typeof value === 'string') return scrubString(value)
+  if (depth > 0 && Array.isArray(value)) return value.map((v) => scrub(v, depth - 1))
+  if (depth > 0 && isPlainObject(value)) {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(value)) out[k] = scrub(v, depth - 1)
     return out
   }
+  // pino's redact traversal breaks on some exotic instances (e.g. URL); their
+  // JSON form is what would be serialized anyway, so hand over that instead.
+  if (value !== null && typeof value === 'object' && !(value instanceof Error)) {
+    const toJSON = (value as { toJSON?: unknown }).toJSON
+    if (typeof toJSON === 'function') return scrub((toJSON as () => unknown).call(value), depth)
+  }
   return value
+}
+
+function scrubArg(a: unknown): unknown {
+  return typeof a === 'string' ? scrubString(a) : a
 }
 
 export function createLogger(opts: {
@@ -51,6 +71,20 @@ export function createLogger(opts: {
     name: opts.name,
     level: opts.level ?? 'info',
     redact: { paths: REDACT_PATHS, censor: CENSOR },
+    serializers: {
+      err: (err: unknown) => {
+        const out = pino.stdSerializers.err(err as Error) as unknown as Record<string, unknown>
+        if (typeof out.message === 'string') out.message = scrubString(out.message)
+        if (typeof out.stack === 'string') out.stack = scrubString(out.stack)
+        return out
+      },
+    },
+    hooks: {
+      logMethod(args, method) {
+        const scrubbed = args.map((a, i) => (i > 0 || typeof a === 'string' ? scrubArg(a) : a))
+        method.apply(this, scrubbed as unknown as Parameters<typeof method>)
+      },
+    },
     formatters: {
       // strings at first and second level of the log object
       log: (obj) => scrub(obj, 2) as Record<string, unknown>,

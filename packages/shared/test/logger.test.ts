@@ -63,4 +63,31 @@ describe('logger', () => {
     log.info({ req: { url: 'https://x/?a=1&X-Amz-Signature=zzz9' } }, 'x')
     expect(lines.join('')).not.toContain('zzz9')
   })
+
+  it('preserva valores n�o-planos (Date, URL, Map, Buffer)', () => {
+    const { lines, log } = capture()
+    const d = new Date('2026-01-02T03:04:05.000Z')
+    log.info({ scheduledAt: d, u: new URL('https://x/y'), n: { at: d } }, 'x')
+    const j = JSON.parse(lines[0]!)
+    expect(j.scheduledAt).toBe(d.toISOString())
+    expect(j.u).toBe('https://x/y')
+    expect(j.n.at).toBe(d.toISOString())
+  })
+
+  it('redige X-Amz-Signature em erros', () => {
+    const { lines, log } = capture()
+    log.error({ err: new Error('GET https://x/o?X-Amz-Signature=abc123 failed') }, 'x')
+    const out = lines.join('')
+    expect(out).not.toContain('abc123')
+    expect(JSON.parse(lines[0]!).err.message).toContain('X-Amz-Signature=[REDACTED]')
+  })
+
+  it('redige X-Amz-Signature na mensagem do log', () => {
+    const { lines, log } = capture()
+    log.info('fetch https://x/o?X-Amz-Signature=abc123&a=1')
+    log.info({ a: 1 }, 'fetch https://x/o?X-Amz-Signature=def456')
+    const out = lines.join('')
+    expect(out).not.toContain('abc123')
+    expect(out).not.toContain('def456')
+  })
 })
