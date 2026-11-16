@@ -7,3 +7,5 @@ coverage
 **/src/generated
 .superpowers/
 *.tsbuildinfo
+test-results
+playwright-report

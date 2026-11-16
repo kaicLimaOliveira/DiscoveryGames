@@ -10,10 +10,33 @@ const PRISMA_MARKER = 'getPrismaClient('
 const IMPORT_META_FROM = 'fileURLToPath(globalThis._importMeta_.url)'
 const IMPORT_META_TO = 'fileURLToPath(import.meta.url)'
 
+/**
+ * O leitor de assets públicos do Nitro resolve `../public/...` a partir de
+ * `dirname(import.meta.url)` do chunk (`server/chunks/_/`), não de `server/`: todos os
+ * arquivos de `/_nuxt/` davam 404 no build de produção. Aqui sobe do chunk até `server/`.
+ * O build falha se o padrão mudar.
+ */
+const ASSET_MARKER = 'function readAsset'
+const ASSET_FROM = 'const serverDir = dirname(fileURLToPath(globalThis._importMeta_.url));'
+
 const prismaImportMetaUrl = {
   name: 'central:prisma-import-meta-url',
   renderChunk(code: string, chunk: { fileName: string }) {
-    if (!code.includes(PRISMA_MARKER)) return null
+    if (code.includes(ASSET_MARKER)) {
+      if (!code.includes(ASSET_FROM)) {
+        throw new Error(
+          `[central:prisma-import-meta-url] padrão do leitor de assets não encontrado no chunk ` +
+            `(${chunk.fileName}); revise o patch.`,
+        )
+      }
+      // Sobe da pasta do chunk (ex.: chunks/_/) até server/.
+      const up = '../'.repeat(chunk.fileName.split('/').length - 1)
+      code = code.replace(
+        ASSET_FROM,
+        `const serverDir = fileURLToPath(new URL(${JSON.stringify(up)}, import.meta.url));`,
+      )
+    }
+    if (!code.includes(PRISMA_MARKER)) return { code, map: null }
     if (!code.includes(IMPORT_META_FROM)) {
       throw new Error(
         `[central:prisma-import-meta-url] padrão "${IMPORT_META_FROM}" não encontrado no ` +
@@ -27,7 +50,13 @@ const prismaImportMetaUrl = {
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
-  modules: ['nuxt-auth-utils'],
+  modules: ['@nuxt/ui', 'nuxt-auth-utils'],
+  css: ['~/assets/css/main.css'],
+  // Sem fontes externas: a CSP só permite recursos da própria origem.
+  ui: { fonts: false },
+  // Ícones embutidos no bundle do cliente: nada de API do Iconify (a CSP bloqueia) e o
+  // /api/_nuxt_icon cairia no middleware de sessão.
+  icon: { clientBundle: { scan: true }, fallbackToApi: false },
   devtools: { enabled: false },
   telemetry: false,
   typescript: {

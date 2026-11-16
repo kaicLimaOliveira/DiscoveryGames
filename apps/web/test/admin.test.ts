@@ -44,6 +44,7 @@ interface Route {
 }
 
 const ROUTES: Route[] = [
+  { name: 'GET brands', method: 'GET', path: () => '/api/admin/brands' },
   { name: 'GET users', method: 'GET', path: () => '/api/admin/users' },
   {
     name: 'POST users',
@@ -246,5 +247,16 @@ describe('administração de usuários', () => {
     expect((await old.request('/api/admin/users')).status).toBe(401)
     // Um novo login funciona normalmente.
     expect((await (await loggedIn(user)).request('/api/admin/users')).status).toBe(403)
+  })
+})
+
+describe('GET /api/admin/brands', () => {
+  it('lista marcas com id, name e slug', async () => {
+    const res = await clients.admin.request('/api/admin/brands')
+    expect(res.status).toBe(200)
+    const brands = (res.body as { brands: Array<Record<string, unknown>> }).brands
+    const found = brands.find((b) => b.id === brandId)
+    expect(found).toBeDefined()
+    expect(Object.keys(found!).sort()).toEqual(['id', 'name', 'slug'])
   })
 })

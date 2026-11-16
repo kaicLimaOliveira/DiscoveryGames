@@ -323,3 +323,30 @@ describe('cabeçalhos', () => {
     expect(res.headers.get('x-request-id')).toBe('req-teste-123')
   })
 })
+
+describe('GET /api/auth/me', () => {
+  it('sem sessão → 401', async () => {
+    expect((await new Client().request('/api/auth/me')).status).toBe(401)
+  })
+
+  it('editor: stage full e isAdmin false', async () => {
+    const client = await loggedIn(editor)
+    const res = await client.request('/api/auth/me')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({
+      id: editor.id,
+      name: 'editor',
+      email: editor.email,
+      stage: 'full',
+      isAdmin: false,
+    })
+  })
+
+  it('admin com 2FA pendente: responde com stage totp_pending e isAdmin true', async () => {
+    const client = new Client()
+    expect((await client.login(admin.email, admin.password)).status).toBe(200)
+    const res = await client.request('/api/auth/me')
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ stage: 'totp_pending', isAdmin: true })
+  })
+})
