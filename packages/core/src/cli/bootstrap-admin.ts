@@ -2,7 +2,8 @@ import { parseArgs } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { createPrisma, type Db } from '@central/db'
 import { baseEnvSchema, loadConfig } from '@central/shared'
-import { bootstrapAdmin } from '../auth/identity-service.js'
+import { bootstrapAdmin } from '../auth/bootstrap-admin.js'
+import { normalizeEmail } from '../auth/identity-service.js'
 import { ConflictError } from '../errors.js'
 
 export interface BootstrapCliDeps {
@@ -46,7 +47,7 @@ export async function runBootstrapCli(argv: string[], deps: BootstrapCliDeps): P
       brandName: values['brand-name']!,
       brandSlug: values['brand-slug']!,
     })
-    deps.out(`Administrador criado: ${values.email!.trim().toLowerCase()}`)
+    deps.out(`Administrador criado: ${normalizeEmail(values.email!)}`)
     deps.out(`Senha: ${password}`)
     deps.out('Guarde esta senha agora; ela não será exibida novamente.')
     return 0

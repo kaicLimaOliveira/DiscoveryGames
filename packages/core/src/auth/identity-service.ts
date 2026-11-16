@@ -1,5 +1,4 @@
-import { randomInt } from 'node:crypto'
-import type { BrandRole, Db, GlobalRole, Tx, UserStatus } from '@central/db'
+import type { BrandRole, Db, DbOrTx, GlobalRole, Tx, UserStatus } from '@central/db'
 import type { SecretCipher } from '@central/shared'
 import { writeAudit } from '../audit.js'
 import { can, requires2fa, type Actor } from '../authz/roles.js'
@@ -58,7 +57,7 @@ export interface IdentityService {
 
 const MIN_PASSWORD = 12
 
-const normalizeEmail = (email: string): string => email.trim().toLowerCase()
+export const normalizeEmail = (email: string): string => email.trim().toLowerCase()
 
 function assertPassword(password: string): void {
   if (password.length < MIN_PASSWORD) {
@@ -66,14 +65,17 @@ function assertPassword(password: string): void {
   }
 }
 
-function isUniqueViolation(err: unknown): boolean {
+export function isUniqueViolation(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
 }
 
 // Hash descartável (calculado uma vez) para igualar o tempo de resposta quando o
 // e-mail não existe, sem revelar a existência da conta.
-let dummyHash: Promise<string> | undefined
-const getDummyHash = (): Promise<string> => (dummyHash ??= hashPassword('dummy-password-timing'))
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@')
+  if (at < 1 || at === email.length - 1) return '[invalid]'
+  return `${email[0]}***@${email.slice(at + 1)}`
+}
 
 /** Trava os admins ativos até o fim da transação (evita corrida no "último admin"). */
 async function lockActiveAdmins(tx: Tx): Promise<void> {
@@ -89,7 +91,26 @@ export function createIdentityService(deps: {
 }): IdentityService {
   const { db, cipher, limiter, totpIssuer } = deps
   const now = deps.now ?? (() => new Date())
+  // Calculado uma vez, já na criação do serviço.
+  const dummyHash = hashPassword('dummy-password-timing')
+  dummyHash.catch(() => undefined)
+  const getDummyHash = (): Promise<string> => dummyHash
   const totpAad = (id: string) => `user:${id}:totp`
+
+  async function recordLogin(client: DbOrTx, userId: string, ip?: string): Promise<void> {
+    const run = async (tx: DbOrTx) => {
+      await tx.user.update({ where: { id: userId }, data: { lastLoginAt: now() } })
+      await writeAudit(tx, {
+        action: 'auth.login',
+        entityType: 'user',
+        entityId: userId,
+        userId,
+        ip,
+      })
+    }
+    if ('$transaction' in client) await client.$transaction((tx) => run(tx))
+    else await run(client)
+  }
 
   function requireManage(actor: Actor): void {
     if (!can(actor, null, 'users.manage')) throw new ForbiddenError()
@@ -114,22 +135,13 @@ export function createIdentityService(deps: {
           entityType: 'user',
           entityId: user?.id,
           userId: user?.id,
-          diff: { email },
+          // Privacidade: conta existente é identificada por userId; e-mail desconhecido só mascarado.
+          diff: user ? undefined : { email: maskEmail(email) },
           ip,
         })
         throw new InvalidCredentialsError()
       }
       limiter.reset(`email:${email}`)
-      await db.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: now() } })
-        await writeAudit(tx, {
-          action: 'auth.login',
-          entityType: 'user',
-          entityId: user.id,
-          userId: user.id,
-          ip,
-        })
-      })
       const needs2fa = requires2fa({
         userId: user.id,
         globalRole: user.role,
@@ -138,26 +150,39 @@ export function createIdentityService(deps: {
       let stage: LoginStage = 'full'
       if (user.totpEnabledAt) stage = 'totp_pending'
       else if (needs2fa) stage = 'totp_enroll'
+      if (stage === 'full') await recordLogin(db, user.id, ip)
       return { userId: user.id, stage, sessionVersion: user.sessionVersion }
     },
 
     async verifyLoginTotp(userId, code) {
-      const user = await db.user.findUnique({ where: { id: userId } })
-      if (!user || user.status === 'disabled' || !user.totpEnabledAt || !user.totpSecretEnc) {
-        throw new InvalidTotpError()
+      const keys = [`totp:${userId}`]
+      const wait = limiter.retryAfterMs(keys)
+      if (wait > 0) throw new TooManyAttemptsError(wait)
+      try {
+        const user = await db.user.findUnique({ where: { id: userId } })
+        if (!user || user.status === 'disabled' || !user.totpEnabledAt || !user.totpSecretEnc) {
+          throw new InvalidTotpError()
+        }
+        const secret = cipher.decrypt(user.totpSecretEnc, totpAad(userId))
+        const result = verifyTotp(secret, code, user.totpLastUsedStep, now())
+        if (!result.ok) throw new InvalidTotpError()
+        await db.$transaction(async (tx) => {
+          // Atômico: só avança se nenhum outro request consumiu este step ou um posterior.
+          const { count } = await tx.user.updateMany({
+            where: {
+              id: userId,
+              OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { lt: result.step } }],
+            },
+            data: { totpLastUsedStep: result.step },
+          })
+          if (count !== 1) throw new InvalidTotpError()
+          await recordLogin(tx, userId)
+        })
+      } catch (err) {
+        if (err instanceof InvalidTotpError) limiter.recordFailure(keys)
+        throw err
       }
-      const secret = cipher.decrypt(user.totpSecretEnc, totpAad(userId))
-      const result = verifyTotp(secret, code, user.totpLastUsedStep, now())
-      if (!result.ok) throw new InvalidTotpError()
-      // Atômico: só avança se nenhum outro request consumiu este step ou um posterior.
-      const { count } = await db.user.updateMany({
-        where: {
-          id: userId,
-          OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { lt: result.step } }],
-        },
-        data: { totpLastUsedStep: result.step },
-      })
-      if (count !== 1) throw new InvalidTotpError()
+      limiter.reset(keys[0]!)
     },
 
     async startTotpEnrollment(userId) {
@@ -169,8 +194,16 @@ export function createIdentityService(deps: {
     },
 
     async confirmTotpEnrollment(userId, secret, code) {
+      const keys = [`totp:${userId}`]
+      const wait = limiter.retryAfterMs(keys)
+      if (wait > 0) throw new TooManyAttemptsError(wait)
+      const user = await db.user.findUnique({ where: { id: userId } })
+      if (!user || user.status === 'disabled') throw new ForbiddenError()
       const result = verifyTotp(secret, code, null, now())
-      if (!result.ok) throw new InvalidTotpError()
+      if (!result.ok) {
+        limiter.recordFailure(keys)
+        throw new InvalidTotpError()
+      }
       await db.$transaction(async (tx) => {
         const { count } = await tx.user.updateMany({
           where: { id: userId, totpEnabledAt: null },
@@ -188,7 +221,9 @@ export function createIdentityService(deps: {
           entityId: userId,
           userId,
         })
+        await recordLogin(tx, userId)
       })
+      limiter.reset(keys[0]!)
     },
 
     async changePassword(userId, current, next) {
@@ -241,6 +276,9 @@ export function createIdentityService(deps: {
 
     async updateUser(actor, userId, i) {
       requireManage(actor)
+      if (i.status === undefined && i.globalRole === undefined && i.name === undefined) {
+        throw new ValidationError('Nenhuma alteração informada.')
+      }
       await db.$transaction(async (tx) => {
         await lockActiveAdmins(tx)
         const target = await tx.user.findUnique({ where: { id: userId } })
@@ -322,54 +360,4 @@ export function createIdentityService(deps: {
       }))
     },
   }
-}
-
-const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
-
-function generatePassword(length = 20): string {
-  let out = ''
-  for (let i = 0; i < length; i++) out += PASSWORD_ALPHABET[randomInt(PASSWORD_ALPHABET.length)]
-  return out
-}
-
-/** Cria a primeira marca e o admin global. Lança ConflictError se já houver admin. */
-export async function bootstrapAdmin(
-  db: Db,
-  i: { email: string; name: string; brandName: string; brandSlug: string },
-): Promise<{ password: string }> {
-  const password = generatePassword()
-  const passwordHash = await hashPassword(password)
-  const email = normalizeEmail(i.email)
-  try {
-    await db.$transaction(async (tx) => {
-      // Serializa bootstraps concorrentes.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('bootstrap-admin'))`
-      if ((await tx.user.count({ where: { role: 'admin' } })) > 0) {
-        throw new ConflictError('Já existe um administrador global.')
-      }
-      const brand = await tx.brand.create({ data: { name: i.brandName, slug: i.brandSlug } })
-      const user = await tx.user.create({
-        data: {
-          email,
-          name: i.name.trim(),
-          passwordHash,
-          role: 'admin',
-          memberships: { create: { brandId: brand.id, role: 'admin' } },
-        },
-      })
-      await writeAudit(tx, {
-        action: 'user.created',
-        entityType: 'user',
-        entityId: user.id,
-        brandId: brand.id,
-        diff: { email, name: user.name, role: 'admin', bootstrap: true },
-      })
-    })
-  } catch (err) {
-    if (isUniqueViolation(err)) {
-      throw new ConflictError('Já existe usuário ou marca com este e-mail ou slug.')
-    }
-    throw err
-  }
-  return { password }
 }

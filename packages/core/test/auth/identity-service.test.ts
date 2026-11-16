@@ -332,3 +332,104 @@ describe('auditoria', () => {
     expect(JSON.stringify(log.diff ?? null)).not.toContain(secret)
   })
 })
+
+describe('limite de TOTP e auditoria de login', () => {
+  function makeLimitedService(clock: { t: number }): IdentityService {
+    return createIdentityService({
+      db: db!.prisma,
+      cipher,
+      limiter: createLoginRateLimiter({ now: () => clock.t }),
+      totpIssuer: 'Central',
+      now: () => new Date(clock.t),
+    })
+  }
+
+  it('5 códigos errados bloqueiam; o 6º com código certo é recusado; depois da janela funciona', async () => {
+    const clock = { t: NOW.getTime() }
+    const s = makeLimitedService(clock)
+    const admin = await makeAdmin()
+    const { id } = await s.createUser(admin, { email: 'rl@x.com', name: 'R', password: PASSWORD })
+    const { secret } = await s.startTotpEnrollment(id)
+    await s.confirmTotpEnrollment(id, secret, codeAt(secret, new Date(clock.t)))
+    clock.t += 60_000
+    for (let i = 0; i < 5; i++) {
+      await expect(s.verifyLoginTotp(id, '000000')).rejects.toBeInstanceOf(InvalidTotpError)
+    }
+    const good = codeAt(secret, new Date(clock.t))
+    await expect(s.verifyLoginTotp(id, good)).rejects.toBeInstanceOf(TooManyAttemptsError)
+    clock.t += 901_000
+    await s.verifyLoginTotp(id, codeAt(secret, new Date(clock.t)))
+  })
+
+  it('confirmTotpEnrollment também é limitado', async () => {
+    const id = await makeMember('rl2@x.com', 'approver')
+    const { secret } = await svc.startTotpEnrollment(id)
+    for (let i = 0; i < 5; i++) {
+      await expect(svc.confirmTotpEnrollment(id, secret, '000000')).rejects.toBeInstanceOf(
+        InvalidTotpError,
+      )
+    }
+    await expect(svc.confirmTotpEnrollment(id, secret, codeAt(secret, NOW))).rejects.toBeInstanceOf(
+      TooManyAttemptsError,
+    )
+  })
+
+  it('confirmTotpEnrollment de usuário inexistente ou desativado lança ForbiddenError', async () => {
+    await expect(
+      svc.confirmTotpEnrollment(GHOST, 'JBSWY3DPEHPK3PXP', '123456'),
+    ).rejects.toBeInstanceOf(ForbiddenError)
+  })
+
+  it('login_failed não guarda o e-mail digitado de conta existente; mascara o desconhecido', async () => {
+    await makeMember('real@x.com', 'editor')
+    const ip = '6.6.6.6'
+    await svc.login({ email: 'real@x.com', password: 'errada-errada-1', ip }).catch(() => 0)
+    await svc.login({ email: 'Fulano@dominio.com', password: 'x', ip }).catch(() => 0)
+    await svc.login({ email: 'sem-arroba', password: 'x', ip }).catch(() => 0)
+    const logs = await db!.prisma.auditLog.findMany({ where: { action: 'auth.login_failed' } })
+    const dumps = logs.map((l) => JSON.stringify(l.diff))
+    expect(dumps.join('')).not.toContain('real@x.com')
+    expect(dumps).toContain(JSON.stringify({ email: 'f***@dominio.com' }))
+    expect(dumps).toContain(JSON.stringify({ email: '[invalid]' }))
+    expect(logs.filter((l) => l.userId !== null)).toHaveLength(1)
+  })
+
+  it('auth.login e lastLoginAt só quando o login chega a full', async () => {
+    const id = await makeMember('fl@x.com', 'approver')
+    const count = () => db!.prisma.auditLog.count({ where: { action: 'auth.login', userId: id } })
+    const last = async () =>
+      (await db!.prisma.user.findUniqueOrThrow({ where: { id } })).lastLoginAt
+    await svc.login({ email: 'fl@x.com', password: PASSWORD, ip: '7.7.7.7' })
+    expect(await count()).toBe(0)
+    expect(await last()).toBeNull()
+    const secret = await enrollTotp(id)
+    expect(await count()).toBe(1)
+    expect(await last()).not.toBeNull()
+    await svc.login({ email: 'fl@x.com', password: PASSWORD, ip: '7.7.7.7' })
+    expect(await count()).toBe(1)
+    const later = makeService(new Date(NOW.getTime() + 60_000))
+    await later.verifyLoginTotp(id, codeAt(secret, new Date(NOW.getTime() + 60_000)))
+    expect(await count()).toBe(2)
+  })
+
+  it('login com sucesso não zera a chave de IP; a chave de IP bloqueia entre e-mails', async () => {
+    await makeMember('ip1@x.com', 'editor')
+    const ip = '8.8.8.8'
+    for (let i = 0; i < 3; i++) {
+      await svc.login({ email: `x${i}@x.com`, password: 'errada-errada-1', ip }).catch(() => 0)
+    }
+    await svc.login({ email: 'ip1@x.com', password: PASSWORD, ip }) // sucesso, mesmo IP
+    for (let i = 3; i < 5; i++) {
+      await svc.login({ email: `x${i}@x.com`, password: 'errada-errada-1', ip }).catch(() => 0)
+    }
+    // 5 falhas acumuladas no IP apesar do sucesso: bloqueado, mesmo com e-mail novo e senha certa
+    await expect(svc.login({ email: 'ip1@x.com', password: PASSWORD, ip })).rejects.toBeInstanceOf(
+      TooManyAttemptsError,
+    )
+  })
+
+  it('updateUser sem campos lança ValidationError', async () => {
+    const admin = await makeAdmin()
+    await expect(svc.updateUser(admin, admin.id, {})).rejects.toBeInstanceOf(ValidationError)
+  })
+})

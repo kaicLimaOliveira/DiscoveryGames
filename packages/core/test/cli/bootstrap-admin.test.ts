@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest'
 import { startTestDatabase } from '@central/db/testing'
-import { bootstrapAdmin } from '../../src/auth/identity-service.js'
+import { bootstrapAdmin } from '../../src/auth/bootstrap-admin.js'
 import { verifyPassword } from '../../src/auth/password.js'
 import { ConflictError } from '../../src/errors.js'
 import { runBootstrapCli } from '../../src/cli/bootstrap-admin.js'
