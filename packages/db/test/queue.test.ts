@@ -49,7 +49,7 @@ it('job enviado na transação confirmada é processado', async () => {
   await expect(seen).resolves.toEqual({ n: 2 })
 })
 
-it('singletonKey deduplica em fila exclusive e libera ap�s conclus�o', async () => {
+it('singletonKey deduplica em fila exclusive e libera após conclusão', async () => {
   const q = await newQueue('worker', {
     extraQueues: [{ name: 'test.exclusive', policy: 'exclusive' }],
   })
@@ -68,7 +68,7 @@ it('singletonKey deduplica em fila exclusive e libera ap�s conclus�o', async
   })
 })
 
-it('sends sem chave na fila standard n�o deduplicam', async () => {
+it('sends sem chave na fila standard não deduplicam', async () => {
   const q = await newQueue('web')
   const later = new Date(Date.now() + 3_600_000)
   const a = await q.send(QUEUES.systemEcho, { tag: 'nodedupe' }, { startAfter: later })
@@ -78,7 +78,7 @@ it('sends sem chave na fila standard n�o deduplicam', async () => {
   expect(a).not.toBe(b)
 })
 
-it('job com startAfter n�o � processado antes da hora', async () => {
+it('job com startAfter não é processado antes da hora', async () => {
   const q = await newQueue()
   const tag = 'startafter'
   const start = Date.now()
