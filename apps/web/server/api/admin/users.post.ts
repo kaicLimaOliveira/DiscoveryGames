@@ -4,7 +4,7 @@ import { defineApiHandler, readValidated } from '../../utils/errors'
 import { useServices } from '../../utils/services'
 
 const Body = z.object({
-  email: z.email().max(320),
+  email: z.string().trim().toLowerCase().pipe(z.email().max(320)),
   name: z.string().trim().min(1).max(200),
   password: z.string().min(12).max(1024),
   globalRole: z.enum(['admin', 'member']).optional(),

@@ -127,6 +127,17 @@ describe('administração de usuários', () => {
     expect(audit).not.toBeNull()
   })
 
+  it('POST normaliza o e-mail (trim + minúsculas)', async () => {
+    const email = uniqueEmail('norm')
+    const res = await clients.admin.request('/api/admin/users', {
+      method: 'POST',
+      body: { email: `  ${email.toUpperCase()} `, name: 'Norm', password: PASSWORD },
+    })
+    expect(res.status).toBe(201)
+    const user = await db.user.findUniqueOrThrow({ where: { id: (res.body as { id: string }).id } })
+    expect(user.email).toBe(email)
+  })
+
   it('POST com e-mail duplicado → 409', async () => {
     const res = await clients.admin.request('/api/admin/users', {
       method: 'POST',
