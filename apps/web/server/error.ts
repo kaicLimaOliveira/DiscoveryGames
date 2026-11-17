@@ -10,7 +10,8 @@ export default defineNitroErrorHandler(async (error, event, { defaultHandler }) 
   if (!event.path.startsWith('/api/')) return
   // Erros fora do defineApiHandler (middleware, readSession...) passam por aqui: registra pelo
   // logger estruturado (requestId, redação) e silencia o console.error em texto puro do Nitro.
-  if (error.unhandled || error.fatal || error.statusCode >= 500) {
+  // 500 criados por toHttpError não são `unhandled` e já foram registrados lá.
+  if (error.unhandled || error.fatal) {
     const log = event.context.log ?? useServices().logger
     log.error({ err: error }, 'unhandled error')
   }

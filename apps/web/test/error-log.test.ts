@@ -62,7 +62,7 @@ it('erro lançado em middleware sai como linha JSON com requestId, sem stack em 
   await new Promise((r) => setTimeout(r, 300))
 
   const lines = output.split('\n').filter(Boolean)
-  const entry = lines
+  const entries = lines
     .map((l) => {
       try {
         return JSON.parse(l) as LogLine
@@ -70,7 +70,10 @@ it('erro lançado em middleware sai como linha JSON com requestId, sem stack em 
         return null
       }
     })
-    .find((j) => j?.requestId === requestId)
+    .filter((j) => j?.requestId === requestId)
+  // Uma única linha: o erro não é registrado duas vezes.
+  expect(entries).toHaveLength(1)
+  const entry = entries[0]
   expect(entry).toBeDefined()
   expect(entry!.level).toBe(50)
   expect(entry!.err?.message).toContain('falha injetada')
