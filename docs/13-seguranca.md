@@ -52,6 +52,8 @@ Matriz de permissões:
 | Conectar/desconectar contas, configurações, usuários, orçamento | | | | ✔ |
 | Pausa global de publicações | | | ✔ | ✔ |
 
+> **Limitações conhecidas (Fase 1):** ativar o 2FA a partir de uma sessão completa não revoga as outras sessões do usuário, e o logout apenas limpa o cookie no cliente (a sessão selada continua válida até expirar ou até a `sessionVersion` mudar, por troca de senha ou de vínculos). Comportamento mantido por ora.
+
 ## 4. OAuth com as plataformas
 
 - `state` aleatório (≥ 128 bits) armazenado em cookie selado de curta duração e validado no callback.

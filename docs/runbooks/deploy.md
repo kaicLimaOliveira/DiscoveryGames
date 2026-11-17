@@ -39,13 +39,14 @@ Copiar `.env.example` para `/opt/central/.env` e `chmod 600`. Os valores do exem
 
 | Variável | Produção |
 |---|---|
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | usuário, senha forte nova e nome do banco |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | usuário, senha nova e nome do banco. A senha deve ser **URL-safe**: `openssl rand -hex 32`. O compose a insere na `DATABASE_URL` sem URL-encoding, então `/`, `+`, `@`, `:` (comuns em base64) quebram a URL |
 | `PANEL_DOMAIN` | domínio do painel, sem `https://` (o Caddy emite o TLS sozinho). Obrigatório |
 | `APP_ORIGIN` | `https://<PANEL_DOMAIN>` |
 | `NUXT_SESSION_PASSWORD` | `openssl rand -base64 48` |
 | `APP_ENCRYPTION_KEYS` | `echo "1:$(openssl rand -base64 32)"` |
 | `TRUST_PROXY` | `true` (atrás do Caddy) |
-| `TOTP_ISSUER`, `LOG_LEVEL`, `SENTRY_DSN` | opcionais |
+| `TOTP_ISSUER`, `LOG_LEVEL` | opcionais |
+| `SENTRY_DSN` | opcional; na Fase 1 só o **worker** inicializa o Sentry (o web ignora) |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | dados do bucket R2 |
 | `IMAGE_OWNER` | owner do GitHub **em minúsculas** (mesmo usado no `images.yml`) |
 | `IMAGE_TAG` | tag a implantar: `sha-<curto>` ou a versão (`1.2.3`). Evitar `latest`/`edge` em produção |
@@ -56,15 +57,15 @@ As variáveis `MINIO_*` valem só para o compose de desenvolvimento.
 
 ## 5. Deploy
 
-Sempre a partir de `/opt/central`:
+Sempre a partir de `/opt/central`.
+
+**Backup antes de migrar** (mínimo; **pular no primeiro deploy**, quando ainda não há banco): `docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backup-$(date +%F-%H%M).dump` (o `sh -c` roda dentro do container, onde as variáveis existem). Guardar uma cópia fora da VPS.
 
 ```bash
 docker compose -f compose.prod.yaml --env-file .env pull
 docker compose -f compose.prod.yaml --env-file .env run --rm migrate
 docker compose -f compose.prod.yaml --env-file .env up -d --wait
 ```
-
-**Backup antes de migrar** (mínimo): `docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backup-$(date +%F-%H%M).dump` (o `sh -c` roda dentro do container, onde as variáveis existem). Guardar uma cópia fora da VPS.
 
 **Restore** (mínimo): com os serviços parados exceto o `postgres`, `docker compose -f compose.prod.yaml exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < backup-<data>.dump`.
 
