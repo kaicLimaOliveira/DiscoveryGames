@@ -62,6 +62,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Validar compose.prod.yaml
+        run: docker compose -f compose.prod.yaml --env-file .env.example config -q
+        env:
+          PANEL_DOMAIN: painel.example.com
+
       - run: scripts/smoke.sh
 
   # Publica as imagens só depois do CI verde, em main e em tags v*, reaproveitando este run.

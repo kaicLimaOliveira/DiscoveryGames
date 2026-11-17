@@ -47,6 +47,7 @@ services:
       DATABASE_URL: *db-url
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SENTRY_DSN:
+    stop_grace_period: 30s
     healthcheck:
       # Heartbeat recente + schema pgboss instalado (dist/healthcheck.js).
       test: ['CMD', 'node', 'dist/healthcheck.js']
@@ -65,7 +66,6 @@ services:
       NODE_ENV: production
       DATABASE_URL: *db-url
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      SENTRY_DSN:
       APP_ORIGIN: ${APP_ORIGIN}
       NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD}
       TOTP_ISSUER: ${TOTP_ISSUER:-Central de Conteúdo}

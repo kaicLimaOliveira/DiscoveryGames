@@ -58,6 +58,7 @@ services:
       dockerfile: docker/worker.Dockerfile
     image: central-worker:dev
     init: true
+    stop_grace_period: 30s
     environment:
       NODE_ENV: production
       DATABASE_URL: *db-url
