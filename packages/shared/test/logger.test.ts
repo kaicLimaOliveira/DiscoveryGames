@@ -53,9 +53,30 @@ describe('logger', () => {
       ].sort(),
     )
     const obj: Record<string, unknown> = {}
-    for (const n of names) obj[n] = `SECRET_${n}`
+    // `code` é tratado à parte (só em query/body/params).
+    for (const n of names.filter((x) => x !== 'code')) obj[n] = `SECRET_${n}`
     log.info({ ...obj, a: { ...obj, b: { ...obj } } }, 'x')
     expect(lines.join('')).not.toContain('SECRET_')
+  })
+
+  it('redige code só em query/body/params; err.code (ECONNREFUSED, P2002) sobrevive', () => {
+    const { lines, log } = capture()
+    const err = Object.assign(new Error('boom'), { code: 'ECONNREFUSED' })
+    log.info(
+      {
+        err,
+        db: { code: 'P2002' },
+        body: { code: 'oauth-body' },
+        req: { query: { code: 'oauth-query' }, params: { code: 'oauth-params' } },
+      },
+      'x',
+    )
+    const out = lines.join('')
+    const j = JSON.parse(lines[0]!)
+    expect(j.err.code).toBe('ECONNREFUSED')
+    expect(j.db.code).toBe('P2002')
+    expect(j.body.code).toBe('[REDACTED]')
+    expect(out).not.toContain('oauth-')
   })
 
   it('redige X-Amz-Signature em string de segundo nível', () => {
@@ -64,7 +85,7 @@ describe('logger', () => {
     expect(lines.join('')).not.toContain('zzz9')
   })
 
-  it('preserva valores n�o-planos (Date, URL, Map, Buffer)', () => {
+  it('preserva valores não-planos (Date, URL, Map, Buffer)', () => {
     const { lines, log } = capture()
     const d = new Date('2026-01-02T03:04:05.000Z')
     log.info({ scheduledAt: d, u: new URL('https://x/y'), n: { at: d } }, 'x')

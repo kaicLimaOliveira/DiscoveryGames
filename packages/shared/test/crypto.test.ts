@@ -40,7 +40,12 @@ describe('createCipher', () => {
     const c = createCipher(new Map([[1, k(1)]]))
     expect(() => c.decrypt('9.a.b.c', 'a')).toThrow(/versão/)
     const t = c.encrypt('x', 'a')
-    expect(() => c.decrypt(t.slice(0, -2) + 'AA', 'a')).toThrow()
+    // Inverte um bit do primeiro byte da tag (terceiro segmento), sem depender de sorte.
+    const parts = t.split('.')
+    const tag = Buffer.from(parts[2]!, 'base64url')
+    tag[0] = tag[0]! ^ 0x01
+    parts[2] = tag.toString('base64url')
+    expect(() => c.decrypt(parts.join('.'), 'a')).toThrow()
   })
   it('token malformado lança erro claro sem vazar o token', () => {
     const c = createCipher(new Map([[1, k(1)]]))
@@ -50,11 +55,16 @@ describe('createCipher', () => {
     expect(() => c.decrypt('1.a.b.c', 'a')).toThrow(/malformado/)
     expect(() => c.decrypt('1.a+/.b.c', 'a')).toThrow(/malformado/)
     expect(() => c.needsRotation('lixo')).toThrow(/malformado/)
-    try {
-      c.decrypt(t, 'outro')
-    } catch (e) {
-      expect(String(e)).not.toContain(t)
-    }
+    let message = ''
+    expect(() => {
+      try {
+        c.decrypt(t, 'outro')
+      } catch (e) {
+        message = String(e)
+        throw e
+      }
+    }).toThrow()
+    expect(message).not.toContain(t)
   })
   it('rejeita mapa vazio e chaves que não têm 32 bytes', () => {
     expect(() => createCipher(new Map())).toThrow()

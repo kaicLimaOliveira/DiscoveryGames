@@ -14,7 +14,6 @@ const SECRET_NAMES = [
   'access_token',
   'refresh_token',
   'client_secret',
-  'code',
   'password',
   'cookie',
   'totpSecret',
@@ -22,11 +21,18 @@ const SECRET_NAMES = [
 
 const MAX_DEPTH = 4
 
+// `code` (OAuth) só é segredo em objetos com formato de requisição; um `*.code` genérico
+// apagaria códigos de erro (ECONNREFUSED, P2002) de `err.code`.
+const REQUEST_PARENTS = ['query', 'body', 'params'] as const
+const CODE_PATHS: string[] = REQUEST_PARENTS.flatMap((parent) =>
+  Array.from({ length: MAX_DEPTH }, (_, i) => `${'*.'.repeat(i)}${parent}.code`),
+)
+
 // Top level plus wildcard prefixes up to MAX_DEPTH levels of nesting.
 export const REDACT_PATHS: string[] = SECRET_NAMES.flatMap((name) => [
   name,
   ...Array.from({ length: MAX_DEPTH }, (_, i) => `${'*.'.repeat(i + 1)}${name}`),
-])
+]).concat(CODE_PATHS)
 
 const CENSOR = '[REDACTED]'
 const SIGNATURE_RE = /(X-Amz-Signature=)[^&\s"']*/gi
