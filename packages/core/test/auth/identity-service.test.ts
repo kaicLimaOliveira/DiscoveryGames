@@ -450,8 +450,21 @@ describe('limite de TOTP e auditoria de login', () => {
     await svc.login({ email: 'fl@x.com', password: PASSWORD, ip: '7.7.7.7' })
     expect(await count()).toBe(1)
     const later = makeService(new Date(NOW.getTime() + 60_000))
-    await later.verifyLoginTotp(id, codeAt(secret, new Date(NOW.getTime() + 60_000)))
+    await later.verifyLoginTotp(id, codeAt(secret, new Date(NOW.getTime() + 60_000)), '7.7.7.7')
     expect(await count()).toBe(2)
+  })
+
+  it('auth.login de usuário com 2FA grava o IP (verifyLoginTotp e confirmTotpEnrollment)', async () => {
+    const id = await makeMember('ipa@x.com', 'approver')
+    const { secret } = await svc.startTotpEnrollment(id)
+    await svc.confirmTotpEnrollment(id, secret, codeAt(secret, NOW), '5.5.5.5')
+    const later = makeService(new Date(NOW.getTime() + 60_000))
+    await later.verifyLoginTotp(id, codeAt(secret, new Date(NOW.getTime() + 60_000)), '6.6.6.6')
+    const logs = await db!.prisma.auditLog.findMany({
+      where: { action: 'auth.login', userId: id },
+      orderBy: { createdAt: 'asc' },
+    })
+    expect(logs.map((l) => l.ip)).toEqual(['5.5.5.5', '6.6.6.6'])
   })
 
   it('login com sucesso não zera a chave de IP; a chave de IP bloqueia entre e-mails', async () => {

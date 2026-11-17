@@ -23,9 +23,9 @@ export interface IdentityService {
     password: string
     ip: string
   }): Promise<{ userId: string; stage: LoginStage; sessionVersion: number }>
-  verifyLoginTotp(userId: string, code: string): Promise<void>
+  verifyLoginTotp(userId: string, code: string, ip?: string): Promise<void>
   startTotpEnrollment(userId: string): Promise<{ secret: string; uri: string }>
-  confirmTotpEnrollment(userId: string, secret: string, code: string): Promise<void>
+  confirmTotpEnrollment(userId: string, secret: string, code: string, ip?: string): Promise<void>
   changePassword(userId: string, current: string, next: string): Promise<{ sessionVersion: number }>
   createUser(
     actor: Actor,
@@ -69,8 +69,6 @@ export function isUniqueViolation(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
 }
 
-// Hash descartável (calculado uma vez) para igualar o tempo de resposta quando o
-// e-mail não existe, sem revelar a existência da conta.
 function maskEmail(email: string): string {
   const at = email.lastIndexOf('@')
   if (at < 1 || at === email.length - 1) return '[invalid]'
@@ -96,7 +94,8 @@ export function createIdentityService(deps: {
 }): IdentityService {
   const { db, cipher, limiter, totpIssuer } = deps
   const now = deps.now ?? (() => new Date())
-  // Calculado uma vez, já na criação do serviço.
+  // Hash descartável (calculado uma vez, já na criação do serviço) para igualar o tempo de
+  // resposta quando o e-mail não existe, sem revelar a existência da conta.
   const dummyHash = hashPassword('dummy-password-timing')
   dummyHash.catch(() => undefined)
   const getDummyHash = (): Promise<string> => dummyHash
@@ -159,7 +158,7 @@ export function createIdentityService(deps: {
       return { userId: user.id, stage, sessionVersion: user.sessionVersion }
     },
 
-    async verifyLoginTotp(userId, code) {
+    async verifyLoginTotp(userId, code, ip) {
       const keys = [`totp:${userId}`]
       const wait = limiter.retryAfterMs(keys)
       if (wait > 0) throw new TooManyAttemptsError(wait)
@@ -181,7 +180,7 @@ export function createIdentityService(deps: {
             data: { totpLastUsedStep: result.step },
           })
           if (count !== 1) throw new InvalidTotpError()
-          await recordLogin(tx, userId)
+          await recordLogin(tx, userId, ip)
         })
       } catch (err) {
         if (err instanceof InvalidTotpError) limiter.recordFailure(keys)
@@ -198,7 +197,7 @@ export function createIdentityService(deps: {
       return { secret, uri: totpUri(secret, user.email, totpIssuer) }
     },
 
-    async confirmTotpEnrollment(userId, secret, code) {
+    async confirmTotpEnrollment(userId, secret, code, ip) {
       const keys = [`totp:${userId}`]
       const wait = limiter.retryAfterMs(keys)
       if (wait > 0) throw new TooManyAttemptsError(wait)
@@ -226,7 +225,7 @@ export function createIdentityService(deps: {
           entityId: userId,
           userId,
         })
-        await recordLogin(tx, userId)
+        await recordLogin(tx, userId, ip)
       })
       limiter.reset(keys[0]!)
     },
