@@ -47,6 +47,11 @@ describe('GET /api/health', () => {
     expect(Date.parse(body.checks.worker.lastSeenAt!)).not.toBeNaN()
   })
 
+  it('gancho x-test-fault é inerte sem WEB_TEST_FAULT (produção)', async () => {
+    const res = await new Client().request('/api/health', { headers: { 'x-test-fault': '1' } })
+    expect(res.status).toBe(200)
+  })
+
   it('sem heartbeat → 503 com checks.worker.ok === false', async () => {
     await db.heartbeat.deleteMany({ where: { name: 'worker' } })
     const { status, body } = await health()
