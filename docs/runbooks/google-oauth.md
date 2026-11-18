@@ -54,7 +54,7 @@ A cota é **por projeto do Google**, não por canal ou organização, então tod
 - reset à meia-noite do horário do Pacífico;
 - existe ainda um limite diário de uploads **por canal**, independente da cota, e o número não é publicado (❓).
 
-**Aumento de cota:** exige auditoria de compliance, pelo [YouTube API Services Audit and Quota Extension Form](https://support.google.com/youtube/contact/yt_api_form), sem prazo publicado (🔒, [youtube.md](../07-integracoes/youtube.md) §4 e §10.4). Pela spec §5.5, esse pedido entra como tarefa no início da fase de publicação (Fase 5).
+**Aumento de cota:** exige auditoria de compliance, pelo [YouTube API Services Audit and Quota Extension Form](https://support.google.com/youtube/contact/yt_api_form), sem prazo publicado (🔒, [youtube.md](../07-integracoes/youtube.md) §4 e §10.4). Pela spec §5.5, o pedido só é necessário se o volume somado das organizações se aproximar de 100 uploads/dia. O painel avisa quando o uso passar de 80% do limite diário.
 
 ## 7. Problemas comuns
 
