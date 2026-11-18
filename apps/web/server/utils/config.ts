@@ -23,6 +23,14 @@ export const webEnvSchema = baseEnvSchema
         .default('false')
         .transform((v) => v === 'true'),
     ),
+    // Só mostra ou esconde o envio por link na interface; a rota de link usa `linkEnabled`.
+    YTDLP_ENABLED: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(['true', 'false'])
+        .default('false')
+        .transform((v) => v === 'true'),
+    ),
     // Meta: a integração só vale com as três definidas; sem valor padrão para a versão.
     META_APP_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     META_APP_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),

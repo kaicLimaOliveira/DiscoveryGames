@@ -97,6 +97,8 @@ services:
       META_GRAPH_VERSION:
       GOOGLE_OAUTH_CLIENT_ID:
       GOOGLE_OAUTH_CLIENT_SECRET:
+      # Só mostra ou esconde o envio por link na interface (quem baixa é o worker).
+      YTDLP_ENABLED:
     healthcheck:
       test:
         [

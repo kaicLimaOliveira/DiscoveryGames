@@ -1,14 +1,22 @@
 import {
   createAccountService,
   createIdentityService,
+  createBudgetService,
+  createCandidateService,
   createLoginRateLimiter,
   createOrganizationService,
+  createPartnerCreatorService,
+  createSourceService,
   type AccountService,
+  type BudgetService,
+  type CandidateService,
   type IdentityService,
   type OrganizationService,
+  type PartnerCreatorService,
+  type SourceService,
 } from '@central/core'
 import { createPgBossQueue, createPrisma, type Db, type PgBossQueue } from '@central/db'
-import { createCipher, createLogger } from '@central/shared'
+import { createCipher, createLogger, type JobQueue } from '@central/shared'
 import {
   createGoogleOAuth,
   createMetaGraphClient,
@@ -25,6 +33,10 @@ export interface Services {
   identity: IdentityService
   organizations: OrganizationService
   accounts: AccountService
+  sources: SourceService
+  candidates: CandidateService
+  partnerCreators: PartnerCreatorService
+  budget: BudgetService
   storage: Storage
   /** Cliente da Graph API; `null` quando a integração Meta não está configurada. */
   metaGraph: MetaGraphClient | null
@@ -56,6 +68,17 @@ export function useServices(): Services {
   const organizations = createOrganizationService({ db })
   const accounts = createAccountService({ db, cipher, logger })
   const storage = createStorage(config)
+  // O serviço de fontes pede um JobQueue síncrono; a fila pg-boss conecta na primeira
+  // chamada (lazy), então o adaptador espera `queue()` a cada envio.
+  const jobQueue: JobQueue = {
+    async send(name, data, opts) {
+      return (await services!.queue()).send(name, data, opts)
+    },
+  }
+  const sources = createSourceService({ db, storage, queue: jobQueue, logger })
+  const candidates = createCandidateService({ db, storage })
+  const partnerCreators = createPartnerCreatorService({ db, storage })
+  const budget = createBudgetService({ db })
   const meta = metaConfig(config)
   const google = googleConfig(config)
   services = {
@@ -63,6 +86,10 @@ export function useServices(): Services {
     identity,
     organizations,
     accounts,
+    sources,
+    candidates,
+    partnerCreators,
+    budget,
     storage,
     metaGraph: meta ? createMetaGraphClient(meta) : null,
     google: google ? createGoogleOAuth(google) : null,
