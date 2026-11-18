@@ -27,6 +27,9 @@ export type QueuePolicy = 'standard' | 'short' | 'exclusive' | 'stately'
  */
 export const QUEUE_POLICIES: Record<QueueName, QueuePolicy> = {
   [QUEUES.systemEcho]: 'standard',
+  // Uma análise e um download por fonte; o limite global de 1 por vez é a concorrência do worker.
+  [QUEUES.sourceAnalyze]: 'exclusive',
+  [QUEUES.sourceDownload]: 'exclusive',
 }
 
 export interface PgBossQueue extends JobQueue {

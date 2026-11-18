@@ -172,12 +172,22 @@ importers:
       '@central/shared':
         specifier: workspace:*
         version: link:../shared
+      '@central/storage':
+        specifier: workspace:*
+        version: link:../storage
       '@node-rs/argon2':
         specifier: 2.2.2
         version: 2.2.2
       otpauth:
         specifier: 9.6.0
         version: 9.6.0
+    devDependencies:
+      '@aws-sdk/client-s3':
+        specifier: 3.1169.0
+        version: 3.1169.0
+      '@testcontainers/minio':
+        specifier: 12.2.1
+        version: 12.2.1(bare-buffer@3.7.2)
 
   packages/db:
     dependencies:

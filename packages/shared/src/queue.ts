@@ -2,7 +2,11 @@ export type SqlExecutor = {
   executeSql(text: string, values?: unknown[]): Promise<{ rows: unknown[] }>
 }
 
-export const QUEUES = { systemEcho: 'system.echo' } as const
+export const QUEUES = {
+  systemEcho: 'system.echo',
+  sourceAnalyze: 'source.analyze',
+  sourceDownload: 'source.download',
+} as const
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
 
 export interface SendOptions {
