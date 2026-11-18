@@ -14,6 +14,7 @@
   "dependencies": {
     "@central/core": "workspace:*",
     "@central/db": "workspace:*",
+    "@central/platforms": "workspace:*",
     "@central/shared": "workspace:*",
     "@central/storage": "workspace:*",
     "@iconify-json/lucide": "1.2.155",

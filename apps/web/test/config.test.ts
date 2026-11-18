@@ -1,6 +1,6 @@
 import { loadConfig } from '@central/shared'
 import { describe, expect, it } from 'vitest'
-import { webEnvSchema } from '../server/utils/config'
+import { metaConfig, webEnvSchema } from '../server/utils/config'
 
 const base = {
   DATABASE_URL: 'postgres://u:p@h:5432/d',
@@ -23,5 +23,31 @@ describe('webEnvSchema', () => {
     const c = loadConfig(webEnvSchema, { ...base, TOTP_ISSUER: 'Minha', TRUST_PROXY: 'true' })
     expect(c.TOTP_ISSUER).toBe('Minha')
     expect(c.TRUST_PROXY).toBe(true)
+  })
+
+  describe('metaConfig', () => {
+    const meta = { META_APP_ID: '123', META_APP_SECRET: 'segredo', META_GRAPH_VERSION: 'v21.0' }
+    const load = (extra: Record<string, string>) => loadConfig(webEnvSchema, { ...base, ...extra })
+
+    it('só vale com os três META_* (vazios contam como ausentes)', () => {
+      expect(metaConfig(load({}))).toBeNull()
+      expect(metaConfig(load({ ...meta, META_GRAPH_VERSION: '' }))).toBeNull()
+      expect(metaConfig(load({ ...meta, META_APP_ID: '' }))).toBeNull()
+      expect(metaConfig(load(meta))).toEqual({
+        appSecret: 'segredo',
+        graphVersion: 'v21.0',
+        baseUrl: undefined,
+      })
+    })
+    it('META_GRAPH_VERSION precisa ter o formato vN.N', () => {
+      expect(() => load({ ...meta, META_GRAPH_VERSION: '21' })).toThrow()
+      expect(() => load({ ...meta, META_GRAPH_VERSION: 'v21' })).toThrow()
+    })
+    it('META_GRAPH_BASE_URL vale fora de produção e é ignorada com NODE_ENV=production', () => {
+      const url = 'http://127.0.0.1:9999'
+      expect(metaConfig(load({ ...meta, META_GRAPH_BASE_URL: url }))?.baseUrl).toBe(url)
+      const prod = load({ ...meta, META_GRAPH_BASE_URL: url, NODE_ENV: 'production' })
+      expect(metaConfig(prod)?.baseUrl).toBeUndefined()
+    })
   })
 })

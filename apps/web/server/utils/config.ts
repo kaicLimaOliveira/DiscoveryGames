@@ -23,9 +23,38 @@ export const webEnvSchema = baseEnvSchema
         .default('false')
         .transform((v) => v === 'true'),
     ),
+    // Meta: a integração só vale com as três definidas; sem valor padrão para a versão.
+    META_APP_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    META_APP_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    META_GRAPH_VERSION: z.preprocess(
+      emptyAsUnset,
+      z
+        .string()
+        .regex(/^v\d+\.\d+$/)
+        .optional(),
+    ),
+    // SÓ PARA TESTES: host alternativo da Graph API. Ignorada com NODE_ENV=production.
+    META_GRAPH_BASE_URL: z.preprocess(emptyAsUnset, z.url().optional()),
   })
 
 export type WebConfig = z.infer<typeof webEnvSchema>
+
+export interface MetaConfig {
+  appSecret: string
+  graphVersion: string
+  baseUrl?: string
+}
+
+/** Configuração da Meta, ou `null` se faltar qualquer um dos três `META_*`. */
+export function metaConfig(config: WebConfig): MetaConfig | null {
+  const { META_APP_ID, META_APP_SECRET, META_GRAPH_VERSION } = config
+  if (!META_APP_ID || !META_APP_SECRET || !META_GRAPH_VERSION) return null
+  return {
+    appSecret: META_APP_SECRET,
+    graphVersion: META_GRAPH_VERSION,
+    baseUrl: config.NODE_ENV === 'production' ? undefined : config.META_GRAPH_BASE_URL,
+  }
+}
 
 let cached: WebConfig | undefined
 

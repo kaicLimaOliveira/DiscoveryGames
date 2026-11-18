@@ -47,6 +47,9 @@ importers:
       '@central/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@central/platforms':
+        specifier: workspace:*
+        version: link:../../packages/platforms
       '@central/shared':
         specifier: workspace:*
         version: link:../../packages/shared

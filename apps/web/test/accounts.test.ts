@@ -82,6 +82,20 @@ describe('contas vinculadas', () => {
     expect(await db.socialAccount.count({ where: { id: account.id } })).toBe(1)
   })
 
+  it('admin da A não apaga conta da B pelo caminho da A (404) e a conta permanece', async () => {
+    const created = await clients.adminB.request(`/api/orgs/${orgB}/accounts/tiktok`, {
+      method: 'POST',
+      body: { handle: handle() },
+    })
+    expect(created.status).toBe(201)
+    const accountId = (created.body as { id: string }).id
+    const del = await clients.adminA.request(`/api/orgs/${orgA}/accounts/${accountId}`, {
+      method: 'DELETE',
+    })
+    expect(del.status).toBe(404)
+    expect(await db.socialAccount.count({ where: { id: accountId, organizationId: orgB } })).toBe(1)
+  })
+
   it('TikTok duplicado entre organizações → 409', async () => {
     const h = handle()
     const first = await clients.adminA.request(`/api/orgs/${orgA}/accounts/tiktok`, {

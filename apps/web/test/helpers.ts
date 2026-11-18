@@ -10,13 +10,13 @@ import { OUTPUT_DIR, ROOT_DIR, TEST_ORIGIN } from './constants'
 export const env = inject('webEnv')
 
 /** Sobe o servidor Nitro já construído no globalSetup (um processo por arquivo de teste). */
-export async function setupServer(): Promise<void> {
+export async function setupServer(extraEnv: Record<string, string> = {}): Promise<void> {
   await setup({
     rootDir: ROOT_DIR,
     build: false,
     server: true,
     nuxtConfig: { nitro: { output: { dir: OUTPUT_DIR } } },
-    env,
+    env: { ...env, ...extraEnv },
   })
 }
 

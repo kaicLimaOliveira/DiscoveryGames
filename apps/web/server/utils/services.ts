@@ -9,8 +9,9 @@ import {
 } from '@central/core'
 import { createPgBossQueue, createPrisma, type Db, type PgBossQueue } from '@central/db'
 import { createCipher, createLogger } from '@central/shared'
+import { createMetaGraphClient, type MetaGraphClient } from '@central/platforms'
 import { createStorage, type Storage } from '@central/storage'
-import { useWebConfig } from './config'
+import { metaConfig, useWebConfig } from './config'
 
 export type Logger = ReturnType<typeof createLogger>
 
@@ -20,6 +21,8 @@ export interface Services {
   organizations: OrganizationService
   accounts: AccountService
   storage: Storage
+  /** Cliente da Graph API; `null` quando a integração Meta não está configurada. */
+  metaGraph: MetaGraphClient | null
   /** Fila pg-boss (papel `web`, sem migrações), conectada na primeira chamada. */
   queue(): Promise<PgBossQueue>
   logger: Logger
@@ -46,12 +49,14 @@ export function useServices(): Services {
   const organizations = createOrganizationService({ db })
   const accounts = createAccountService({ db, cipher, logger })
   const storage = createStorage(config)
+  const meta = metaConfig(config)
   services = {
     db,
     identity,
     organizations,
     accounts,
     storage,
+    metaGraph: meta ? createMetaGraphClient(meta) : null,
     logger,
     queue() {
       queuePromise ??= createPgBossQueue({
