@@ -30,6 +30,8 @@ async function main(): Promise<void> {
       llm,
       model: config.AI_MODEL,
       scratchRoot: config.SCRATCH_DIR,
+      ytdlpEnabled: config.YTDLP_ENABLED,
+      ytdlpPath: config.YTDLP_PATH ?? 'yt-dlp',
     },
   )
 

@@ -1,9 +1,19 @@
 import type { Logger } from 'pino'
 import type { LlmProvider, Transcriber } from '@central/ai'
 import { createPgBossQueue, createPrisma } from '@central/db'
+import { ffmpegPath } from '@central/media'
 import { createLogger, QUEUES } from '@central/shared'
 import type { Storage } from '@central/storage'
-import { createSourceAnalyzeHandler, type SourceAnalyzeJob } from './handlers/source-analyze.js'
+import {
+  createSourceAnalyzeHandler,
+  MAX_DURATION_MS,
+  type SourceAnalyzeJob,
+} from './handlers/source-analyze.js'
+import {
+  createSourceDownloadHandler,
+  MAX_DOWNLOAD_BYTES,
+  type SourceDownloadJob,
+} from './handlers/source-download.js'
 import { createEchoHandler } from './handlers/system.js'
 import { startHeartbeat } from './heartbeat.js'
 
@@ -21,6 +31,11 @@ export interface WorkerDeps {
   model: string
   scratchRoot: string
   maxDurationMs: number
+  /** Liga a fila `source.download` (YTDLP_ENABLED); desligada por padrão. */
+  ytdlpEnabled: boolean
+  ytdlpPath: string
+  /** Argumentos antes dos do yt-dlp (só os testes). */
+  ytdlpArgs: string[]
 }
 
 export async function startWorker(
@@ -55,6 +70,27 @@ export async function startWorker(
         }),
         { concurrency: 1 },
       )
+      // Download por link atrás da chave: um por vez; sem retry automático (falha vira `failed`).
+      if (deps.ytdlpEnabled) {
+        await queue.work<SourceDownloadJob['data']>(
+          QUEUES.sourceDownload,
+          createSourceDownloadHandler({
+            db,
+            storage: deps.storage,
+            queue,
+            ytdlpPath: deps.ytdlpPath ?? 'yt-dlp',
+            ...(deps.ytdlpArgs ? { ytdlpArgs: deps.ytdlpArgs } : {}),
+            ffmpegPath: ffmpegPath(),
+            scratchRoot: deps.scratchRoot,
+            maxDurationMs: deps.maxDurationMs ?? MAX_DURATION_MS,
+            maxBytes: MAX_DOWNLOAD_BYTES,
+            logger,
+          }),
+          { concurrency: 1 },
+        )
+      } else {
+        logger.info('YTDLP_ENABLED desligado: fila source.download não será consumida')
+      }
     } else {
       logger.warn('storage não configurado: fila source.analyze não será consumida')
     }

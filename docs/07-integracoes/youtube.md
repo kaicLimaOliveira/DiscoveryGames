@@ -453,3 +453,19 @@ Fonte: [Reporting API](https://developers.google.com/youtube/reporting/v1/report
 - https://support.google.com/youtube/answer/1311392 (políticas de monetização do YPP)
 - https://support.google.com/youtube/answer/2801973 (spam e práticas enganosas)
 - Formulários: https://support.google.com/youtube/contact/yt_api_form · https://support.google.com/youtube/contact/yt_api_appeals
+
+---
+
+## 17. Download por link (ferramenta não oficial)
+
+Não é uma integração com a API do YouTube: o worker usa o **yt-dlp** (projeto de terceiros) para baixar um vídeo a partir do link, na fonte do cortador (`kind = youtube_link`). A YouTube Data API v3 não oferece download de vídeos de terceiros.
+
+| Ponto | Situação |
+|---|---|
+| Chave | `YTDLP_ENABLED`, **desligada por padrão**. Desligada, o worker nem consome a fila `source.download`. Quem liga é o dono, ciente dos riscos abaixo. |
+| Termos de uso | ❓ Não analisado nem confirmado com o jurídico. Baixar vídeo fora do player/API oficial pode violar os Termos de Serviço do YouTube; o risco é de quem liga a chave. |
+| Bloqueio de IP | ❓ Esperado em servidores/IPs de datacenter (pedido de "confirmar que você não é um robô", erro HTTP 429). Sem previsão de quando acontece; repetir o download não resolve, então **não há retry automático**. |
+| Versão | `yt-dlp_linux` da release **2026.10.26**, fixada em `docker/worker.Dockerfile` com SHA-256 conferido no build (hash do `SHA2-256SUMS` da release). Atualizar = trocar tag e hash juntos. O YouTube muda com frequência e versões antigas quebram: ❓ rotina de atualização ainda não definida. |
+| Trava de direitos | Link com declaração `none` é recusado antes de enfileirar; o worker confere de novo antes de baixar. |
+| Limites | Vídeo de até 2 h (conferido por `--dump-single-json` antes de baixar), até 4 GB, 1080p no máximo, 1 download por vez, sem playlists. |
+| Falha | A fonte vai para `failed` com "Não foi possível baixar pelo link. Envie o arquivo MP4." O MP4 enviado continua sendo o caminho garantido. |

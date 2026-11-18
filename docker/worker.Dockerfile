@@ -51,6 +51,12 @@ ENV NODE_ENV=production
 # Scratch por job (vídeo, áudio, quadros); em compose vira o volume `scratch`.
 ENV SCRATCH_DIR=/scratch
 RUN mkdir /scratch && chown node:node /scratch
+# yt-dlp (download por link; só roda com YTDLP_ENABLED=true): release fixada e SHA-256 conferido pelo
+# próprio ADD (o build falha se não bater). Hash copiado do SHA2-256SUMS da release 2026.10.26.
+# Para atualizar: trocar a tag e o hash juntos, pegando o hash no SHA2-256SUMS da nova release.
+ENV YTDLP_PATH=/usr/local/bin/yt-dlp
+ADD --checksum=sha256:767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795 --chmod=755   https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux /usr/local/bin/yt-dlp
+RUN /usr/local/bin/yt-dlp --version
 WORKDIR /app
 COPY --from=build --chown=node:node /out/node_modules ./node_modules
 COPY --from=build --chown=node:node /out/dist ./dist
