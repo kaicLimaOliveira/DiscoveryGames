@@ -88,7 +88,18 @@ export function createGroqTranscriber(opts: GroqTranscriberOptions): Transcriber
           headers: { Authorization: `Bearer ${opts.apiKey}` },
           body: form,
         })
-        if (res.ok) return (await res.json()) as GroqVerboseResponse
+        if (res.ok) {
+          try {
+            return (await res.json()) as GroqVerboseResponse
+          } catch {
+            throw new TranscriberError(
+              'A resposta da transcrição não é JSON válido.',
+              'HTTP',
+              false,
+              res.status,
+            )
+          }
+        }
         const retryable = res.status === 429 || res.status >= 500
         // Corpo da resposta não entra na mensagem: pode ecoar credenciais.
         last = new TranscriberError(
@@ -133,7 +144,22 @@ export function createGroqTranscriber(opts: GroqTranscriberOptions): Transcriber
           )
         }
         let lastEnd = 0
-        for (const item of body.words as Array<{ word: string; start: number; end: number }>) {
+        for (const item of body.words as Array<
+          Partial<{ word: string; start: number; end: number }>
+        >) {
+          if (
+            typeof item?.word !== 'string' ||
+            typeof item.start !== 'number' ||
+            !Number.isFinite(item.start) ||
+            typeof item.end !== 'number' ||
+            !Number.isFinite(item.end)
+          ) {
+            throw new TranscriberError(
+              'A resposta da transcrição trouxe palavra sem tempos válidos.',
+              'NO_WORD_TIMESTAMPS',
+              false,
+            )
+          }
           words.push({
             w: item.word,
             s: Math.round(item.start * 1000) + chunk.offsetMs,

@@ -117,6 +117,24 @@ describe('createGroqTranscriber', () => {
     expect(err.retryable).toBe(false)
   })
 
+  it('palavra sem start rejeita com NO_WORD_TIMESTAMPS', async () => {
+    const { fetchFn } = make([() => ok([{ word: 'oi', end: 1 }])])
+    const t = createGroqTranscriber({ apiKey: KEY, fetch: fetchFn, sleep: noSleep })
+    const err = await t.transcribe([{ path: mk('a.ogg'), offsetMs: 0 }], 'pt').catch((e) => e)
+    expect(err.code).toBe('NO_WORD_TIMESTAMPS')
+    expect(err.retryable).toBe(false)
+  })
+
+  it('200 com corpo que não é JSON falha sem repetir (HTTP, não NETWORK)', async () => {
+    const a = make([() => new Response('<html>', { status: 200 })])
+    const t = createGroqTranscriber({ apiKey: KEY, fetch: a.fetchFn, sleep: noSleep })
+    const err = await t.transcribe([{ path: mk('a.ogg'), offsetMs: 0 }], 'pt').catch((e) => e)
+    expect(err.code).toBe('HTTP')
+    expect(err.status).toBe(200)
+    expect(err.retryable).toBe(false)
+    expect(a.calls).toHaveLength(1)
+  })
+
   it('vídeo sem fala (words vazio) é sinal, não erro', async () => {
     const { fetchFn } = make([() => ok([], { text: '' })])
     const t = createGroqTranscriber({ apiKey: KEY, fetch: fetchFn, sleep: noSleep })
