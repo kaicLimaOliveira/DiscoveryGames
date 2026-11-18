@@ -1,0 +1,114 @@
+import { describe, expect, it } from 'vitest'
+import { createLogger, withContext, REDACT_PATHS } from '../src/logger'
+
+function capture() {
+  const lines: string[] = []
+  const log = createLogger({ name: 't', destination: { write: (s: string) => void lines.push(s) } })
+  return { lines, log }
+}
+
+describe('logger', () => {
+  it('redige segredos em qualquer profundidade e mantém contexto', () => {
+    const { lines, log: base } = capture()
+    const log = withContext(base, { requestId: 'r1', jobId: 'j1' })
+    log.info(
+      {
+        headers: { authorization: 'Bearer AAA', cookie: 'c=1' },
+        body: {
+          password: 'p',
+          access_token: 'tok',
+          refresh_token: 'rt',
+          client_secret: 'cs',
+          code: 'oc',
+          totpSecret: 'ts',
+        },
+        url: 'https://x/o?X-Amz-Signature=abc123&a=1',
+      },
+      'msg',
+    )
+    const out = lines.join('')
+    for (const s of ['Bearer AAA', 'c=1', '"p"', '"tok"', '"rt"', '"cs"', '"oc"', '"ts"', 'abc123'])
+      expect(out).not.toContain(s)
+    const j = JSON.parse(lines[0]!)
+    expect(j.requestId).toBe('r1')
+    expect(j.jobId).toBe('j1')
+    expect(j.name).toBe('t')
+    expect(j.url).toBe('https://x/o?X-Amz-Signature=[REDACTED]&a=1')
+    expect(j.body.password).toBe('[REDACTED]')
+  })
+
+  it('redige todos os nomes no topo e aninhados em 3 níveis', () => {
+    const { lines, log } = capture()
+    const names = [...new Set(REDACT_PATHS.map((p) => p.split('.').pop()!))]
+    expect(names.sort()).toEqual(
+      [
+        'access_token',
+        'authorization',
+        'client_secret',
+        'code',
+        'cookie',
+        'password',
+        'refresh_token',
+        'totpSecret',
+      ].sort(),
+    )
+    const obj: Record<string, unknown> = {}
+    // `code` é tratado à parte (só em query/body/params).
+    for (const n of names.filter((x) => x !== 'code')) obj[n] = `SECRET_${n}`
+    log.info({ ...obj, a: { ...obj, b: { ...obj } } }, 'x')
+    expect(lines.join('')).not.toContain('SECRET_')
+  })
+
+  it('redige code só em query/body/params; err.code (ECONNREFUSED, P2002) sobrevive', () => {
+    const { lines, log } = capture()
+    const err = Object.assign(new Error('boom'), { code: 'ECONNREFUSED' })
+    log.info(
+      {
+        err,
+        db: { code: 'P2002' },
+        body: { code: 'oauth-body' },
+        req: { query: { code: 'oauth-query' }, params: { code: 'oauth-params' } },
+      },
+      'x',
+    )
+    const out = lines.join('')
+    const j = JSON.parse(lines[0]!)
+    expect(j.err.code).toBe('ECONNREFUSED')
+    expect(j.db.code).toBe('P2002')
+    expect(j.body.code).toBe('[REDACTED]')
+    expect(out).not.toContain('oauth-')
+  })
+
+  it('redige X-Amz-Signature em string de segundo nível', () => {
+    const { lines, log } = capture()
+    log.info({ req: { url: 'https://x/?a=1&X-Amz-Signature=zzz9' } }, 'x')
+    expect(lines.join('')).not.toContain('zzz9')
+  })
+
+  it('preserva valores não-planos (Date, URL, Map, Buffer)', () => {
+    const { lines, log } = capture()
+    const d = new Date('2026-01-02T03:04:05.000Z')
+    log.info({ scheduledAt: d, u: new URL('https://x/y'), n: { at: d } }, 'x')
+    const j = JSON.parse(lines[0]!)
+    expect(j.scheduledAt).toBe(d.toISOString())
+    expect(j.u).toBe('https://x/y')
+    expect(j.n.at).toBe(d.toISOString())
+  })
+
+  it('redige X-Amz-Signature em erros', () => {
+    const { lines, log } = capture()
+    log.error({ err: new Error('GET https://x/o?X-Amz-Signature=abc123 failed') }, 'x')
+    const out = lines.join('')
+    expect(out).not.toContain('abc123')
+    expect(JSON.parse(lines[0]!).err.message).toContain('X-Amz-Signature=[REDACTED]')
+  })
+
+  it('redige X-Amz-Signature na mensagem do log', () => {
+    const { lines, log } = capture()
+    log.info('fetch https://x/o?X-Amz-Signature=abc123&a=1')
+    log.info({ a: 1 }, 'fetch https://x/o?X-Amz-Signature=def456')
+    const out = lines.join('')
+    expect(out).not.toContain('abc123')
+    expect(out).not.toContain('def456')
+  })
+})

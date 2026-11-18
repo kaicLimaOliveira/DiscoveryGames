@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GlobalRole {
+  admin
+  member
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum BrandRole {
+  viewer
+  editor
+  approver
+  admin
+}
+
+model User {
+  id               String      @id @default(uuid(7)) @db.Uuid
+  email            String      @unique
+  name             String
+  passwordHash     String
+  totpSecretEnc    String?
+  totpEnabledAt    DateTime?   @db.Timestamptz(3)
+  totpLastUsedStep BigInt?
+  role             GlobalRole  @default(member)
+  status           UserStatus  @default(active)
+  sessionVersion   Int         @default(1)
+  lastLoginAt      DateTime?   @db.Timestamptz(3)
+  createdAt        DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime    @updatedAt @db.Timestamptz(3)
+  memberships      BrandMember[]
+  auditLogs        AuditLog[]
+}
+
+model Brand {
+  id                 String        @id @default(uuid(7)) @db.Uuid
+  name               String
+  slug               String        @unique
+  timezone           String        @default("America/Sao_Paulo")
+  locale             String        @default("pt-BR")
+  voiceGuide         Json          @default("{}")
+  aiMonthlyBudgetUsd Decimal?      @db.Decimal(10, 2)
+  active             Boolean       @default(true)
+  createdAt          DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime      @updatedAt @db.Timestamptz(3)
+  members            BrandMember[]
+  settings           Setting[]
+  auditLogs          AuditLog[]
+}
+
+model BrandMember {
+  brandId   String    @db.Uuid
+  userId    String    @db.Uuid
+  role      BrandRole
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([brandId, userId])
+}
+
+// O índice único (brandId, key) NULLS NOT DISTINCT é criado por SQL manual
+// na migração, pois o Prisma não o expressa.
+model Setting {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  brandId   String?  @db.Uuid
+  key       String
+  value     Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  brand     Brand?   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  brandId    String?  @db.Uuid
+  userId     String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String?
+  diff       Json?
+  ip         String?
+  at         DateTime @default(now()) @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  brand      Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([brandId, at])
+}
+
+model Heartbeat {
+  name      String   @id
+  at        DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}

@@ -4,5 +4,8 @@ node_modules
 .nuxt
 dist
 coverage
-src/generated
+**/src/generated
 .superpowers/
+*.tsbuildinfo
+test-results
+playwright-report
