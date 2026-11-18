@@ -15,6 +15,10 @@ const PUBLIC = new Set(['/api/health', '/api/auth/login'])
 // Rota do nuxt-auth-utils (useUserSession): não exige cookie, mas um cookie revogado não
 // pode continuar devolvendo o usuário.
 const AUTH_UTILS_SESSION = '/api/_auth/session'
+// Retorno do Google: sem sessão vira redirect para o login (a URL traz code/state, nunca
+// pode voltar em corpo de erro).
+const OAUTH_CALLBACK = '/api/oauth/youtube/callback'
+export const SESSION_EXPIRED_MESSAGE = 'Sua sessão expirou. Entre e conecte o YouTube de novo.'
 
 /** Sessão + ator válidos (usuário ativo e mesma sessionVersion), ou null. */
 async function validSession(
@@ -45,6 +49,9 @@ export default defineEventHandler(async (event) => {
 
   if (!session || !actor) {
     if (session) await clearUserSession(event)
+    if (path === OAUTH_CALLBACK) {
+      return sendRedirect(event, `/login?error=${encodeURIComponent(SESSION_EXPIRED_MESSAGE)}`, 302)
+    }
     throw createError({ statusCode: 401, message: 'Não autenticado.' })
   }
 

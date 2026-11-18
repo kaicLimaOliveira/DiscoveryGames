@@ -19,5 +19,19 @@ export default defineNitroErrorHandler(async (error, event, { defaultHandler }) 
   setResponseHeaders(event, res.headers)
   setSecurityHeaders(event)
   setResponseStatus(event, res.status, res.statusText)
-  return send(event, JSON.stringify(res.body))
+  // O corpo padrão traz a URL completa; a query pode ter code/state do OAuth. Só o caminho sai.
+  const body = res.body as Record<string, unknown> | null
+  if (body && typeof body === 'object') {
+    const query = event.path.includes('?') ? event.path.slice(event.path.indexOf('?')) : ''
+    for (const key of ['url', 'message', 'statusMessage']) {
+      const value = body[key]
+      if (typeof value !== 'string') continue
+      // O 404 padrão também cita o caminho completo na mensagem.
+      body[key] =
+        key === 'url' ? event.path.split('?')[0] : query ? value.replaceAll(query, '') : value
+    }
+    const data = body.data as Record<string, unknown> | undefined
+    if (data && typeof data.path === 'string') data.path = data.path.split('?')[0]
+  }
+  return send(event, JSON.stringify(body))
 })

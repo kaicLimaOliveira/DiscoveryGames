@@ -7,7 +7,12 @@ import { createOrganization, createUser, db, loggedIn, setupServer, Client } fro
 const uid = () => randomUUID().replaceAll('-', '').slice(0, 12)
 
 const SECRETS = { refresh: 'REFRESH_TOKEN_SECRET', access: 'ACCESS_TOKEN_SECRET' }
-const channels = { ok: `UC${uid()}`, conflict: `UC${uid()}`, perm: `UC${uid()}` }
+const channels = {
+  ok: `UC${uid()}`,
+  conflict: `UC${uid()}`,
+  perm: `UC${uid()}`,
+  scope: `UC${uid()}`,
+}
 const revoked: string[] = []
 
 /** `code` → canal devolvido pelo "Google" falso. */
@@ -15,6 +20,7 @@ const codeToChannel: Record<string, string> = {
   code_ok: channels.ok,
   code_conflict: channels.conflict,
   code_perm: channels.perm,
+  code_scope: channels.scope,
 }
 
 const google: Server = createServer((req, res) => {
@@ -31,6 +37,13 @@ const google: Server = createServer((req, res) => {
       const code = form.get('code') ?? ''
       if (code === 'code_norefresh') return send(200, { access_token: SECRETS.access, scope: 'x' })
       if (!codeToChannel[code]) return send(400, { error: 'invalid_grant' })
+      if (code === 'code_scope') {
+        return send(200, {
+          access_token: `${SECRETS.access}:${codeToChannel[code]}`,
+          refresh_token: SECRETS.refresh,
+          scope: 'https://www.googleapis.com/auth/youtube.readonly',
+        })
+      }
       return send(200, {
         access_token: `${SECRETS.access}:${codeToChannel[code]}`,
         refresh_token: SECRETS.refresh,
@@ -213,9 +226,51 @@ describe('conexão YouTube', () => {
     }
   })
 
-  it('callback exige sessão completa', async () => {
+  it('callback sem sessão redireciona ao login sem ecoar code nem state', async () => {
     const state = await begin(clients.adminA, orgA)
-    expect((await callback(new Client(), { code: 'code_ok', state })).status).toBe(401)
+    const res = await callback(new Client(), { code: 'CODE_SEGREDO', state })
+    expect(res.status).toBe(302)
+    expect(location(res).startsWith('/login?error=')).toBe(true)
+    expect(errorOf(location(res))).toBe('Sua sessão expirou. Entre e conecte o YouTube de novo.')
+    expect(location(res)).not.toContain(state)
+    expect(location(res)).not.toContain('CODE_SEGREDO')
+    expect(JSON.stringify(res.body)).not.toContain(state)
+    expect(JSON.stringify(res.body)).not.toContain('CODE_SEGREDO')
+  })
+
+  it('erro inesperado (500) no callback também redireciona sem ecoar', async () => {
+    // NUL no state faz o Postgres rejeitar a consulta: erro não tratado dentro da rota.
+    const res = await callback(clients.adminA, { code: 'CODE_SEGREDO', state: 'a SEGREDO_STATE' })
+    expect(res.status).toBe(302)
+    expect(location(res).startsWith('/orgs?error=')).toBe(true)
+    expect(location(res)).not.toContain('SEGREDO')
+    expect(JSON.stringify(res.body ?? '')).not.toContain('SEGREDO')
+  })
+
+  it('corpo de erro de /api/** não ecoa a query', async () => {
+    const res = await clients.adminA.request('/api/nao-existe?secret=VALOR_SECRETO')
+    expect(res.status).toBe(404)
+    expect(JSON.stringify(res.body)).not.toContain('VALOR_SECRETO')
+    const anon = await new Client().request('/api/orgs?secret=VALOR_SECRETO')
+    expect(anon.status).toBe(401)
+    expect(JSON.stringify(anon.body)).not.toContain('VALOR_SECRETO')
+  })
+
+  it('conflito e escopo faltando revogam a concessão e não gravam', async () => {
+    const before = revoked.length
+    const state = await begin(clients.adminA, orgA)
+    // channels.conflict já está vinculado em outra organização (teste anterior).
+    await callback(clients.adminA, { code: 'code_conflict', state })
+    expect(revoked.length).toBe(before + 1)
+    expect(revoked.at(-1)).toBe(SECRETS.refresh)
+
+    const s2 = await begin(clients.adminA, orgA)
+    const res = await callback(clients.adminA, { code: 'code_scope', state: s2 })
+    expect(errorOf(location(res))).toBe(
+      'Autorize todas as permissões pedidas (envio e leitura do YouTube) para conectar o canal.',
+    )
+    expect(revoked.length).toBe(before + 2)
+    expect(await db.socialAccount.count({ where: { externalId: channels.scope } })).toBe(0)
   })
 
   it('callback re-confere accounts.manage: perdeu a permissão depois do start', async () => {
@@ -245,11 +300,13 @@ describe('conexão YouTube', () => {
     const account = await db.socialAccount.findFirstOrThrow({
       where: { platform: 'youtube', externalId: channels.ok },
     })
+    const before = revoked.length
     const res = await clients.adminA.request(`/api/orgs/${orgA}/accounts/${account.id}`, {
       method: 'DELETE',
     })
     expect(res.status).toBe(204)
-    expect(revoked).toEqual([SECRETS.refresh])
+    expect(revoked.length).toBe(before + 1)
+    expect(revoked.at(-1)).toBe(SECRETS.refresh)
     expect(await db.socialAccount.count({ where: { id: account.id } })).toBe(0)
   })
 })
