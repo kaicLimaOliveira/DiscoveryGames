@@ -114,15 +114,36 @@ importers:
 
   apps/worker:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: 1.10.0
+        version: 1.10.0(zod@4.6.7)
+      '@aws-sdk/client-s3':
+        specifier: 3.1169.0
+        version: 3.1169.0
+      '@aws-sdk/lib-storage':
+        specifier: 3.1169.0
+        version: 3.1169.0(@aws-sdk/client-s3@3.1169.0)
+      '@aws-sdk/s3-request-presigner':
+        specifier: 3.1169.0
+        version: 3.1169.0
+      '@central/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@central/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@central/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@central/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@central/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@central/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@node-rs/argon2':
         specifier: 2.2.2
         version: 2.2.2
@@ -135,6 +156,12 @@ importers:
       '@sentry/node':
         specifier: 11.12.0
         version: 11.12.0(rollup@4.68.3)
+      ffmpeg-static:
+        specifier: 5.3.0
+        version: 5.3.0
+      ffprobe-static:
+        specifier: 3.1.0
+        version: 3.1.0
       otpauth:
         specifier: 9.6.0
         version: 9.6.0
@@ -148,6 +175,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@testcontainers/minio':
+        specifier: 12.2.1
+        version: 12.2.1(bare-buffer@3.7.2)
       '@testcontainers/postgresql':
         specifier: 12.2.1
         version: 12.2.1(bare-buffer@3.7.2)

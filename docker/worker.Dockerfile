@@ -6,9 +6,11 @@ WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY apps/worker/package.json apps/worker/
+COPY packages/ai/package.json packages/ai/
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/prisma.config.ts packages/db/
 COPY packages/db/prisma packages/db/prisma
+COPY packages/media/package.json packages/media/
 COPY packages/platforms/package.json packages/platforms/
 COPY packages/shared/package.json packages/shared/
 COPY packages/storage/package.json packages/storage/
@@ -46,6 +48,9 @@ CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
 FROM node:24-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS runtime
 ENV NODE_ENV=production
+# Scratch por job (vídeo, áudio, quadros); em compose vira o volume `scratch`.
+ENV SCRATCH_DIR=/scratch
+RUN mkdir /scratch && chown node:node /scratch
 WORKDIR /app
 COPY --from=build --chown=node:node /out/node_modules ./node_modules
 COPY --from=build --chown=node:node /out/dist ./dist
