@@ -19,6 +19,8 @@ const SECRET_NAMES = [
   'totpSecret',
 ] as const
 
+// Profundidade máxima (níveis de objeto/array) em que chaves sensíveis e strings são limpas;
+// o que estiver mais fundo passa sem redação por chave.
 const MAX_DEPTH = 4
 
 // Comparação sem caixa e sem `_`/`-` (accessToken, access_token, ACCESS-TOKEN...). Os paths do
@@ -67,8 +69,15 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null
 }
 
+const TOKEN_PARAM_RE =
+  /((?:access_token|refresh_token|client_secret|code_verifier|appsecret_proof)=)[^&\s"']*/gi
+const BEARER_RE = /(Bearer\s+)[^\s"',;]+/gi
+
 function scrubString(value: string): string {
-  return value.replace(SIGNATURE_RE, `$1${CENSOR}`)
+  return value
+    .replace(SIGNATURE_RE, `$1${CENSOR}`)
+    .replace(TOKEN_PARAM_RE, `$1${CENSOR}`)
+    .replace(BEARER_RE, `$1${CENSOR}`)
 }
 
 function scrub(value: unknown, depth: number): unknown {
@@ -106,9 +115,8 @@ export function createLogger(opts: {
     serializers: {
       err: (err: unknown) => {
         const out = pino.stdSerializers.err(err as Error) as unknown as Record<string, unknown>
-        if (typeof out.message === 'string') out.message = scrubString(out.message)
-        if (typeof out.stack === 'string') out.stack = scrubString(out.stack)
-        return out
+        // o resultado do serializer tem protótipo próprio; copiar para objeto simples para o scrub percorrer
+        return scrub({ ...out }, MAX_DEPTH)
       },
     },
     hooks: {

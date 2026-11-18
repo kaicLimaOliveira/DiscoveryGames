@@ -136,4 +136,28 @@ describe('logger', () => {
     expect(j.nested.credentialEnc).toBe('[REDACTED]')
     expect(j.err.code).toBe('ECONNREFUSED')
   })
+
+  it('redige chaves sensíveis dentro de erros', () => {
+    const { lines, log } = capture()
+    const err = Object.assign(new Error('falhou'), {
+      token: 'xtok',
+      response: { headers: { Authorization: 'Bearer ytok' } },
+    })
+    log.error({ err: new Error('externo', { cause: err }) }, 'x')
+    log.error({ err }, 'x')
+    const out = lines.join('')
+    expect(out).not.toContain('xtok')
+    expect(out).not.toContain('ytok')
+  })
+
+  it('redige tokens em strings (query string e Bearer)', () => {
+    const { lines, log } = capture()
+    const url =
+      'GET https://graph.facebook.com/v1.0/me/accounts?fields=id&access_token=SECRET1&appsecret_proof=SECRET2'
+    log.error({ err: new Error(url) }, url)
+    log.info({ h: 'Authorization: Bearer SECRET3' }, 'Authorization: Bearer SECRET3')
+    const out = lines.join('')
+    for (const v of ['SECRET1', 'SECRET2', 'SECRET3']) expect(out).not.toContain(v)
+    expect(out).toContain('fields=id')
+  })
 })
