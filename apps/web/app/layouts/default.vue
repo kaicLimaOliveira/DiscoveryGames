@@ -30,6 +30,7 @@ async function logout() {
             <OrgSwitcher />
             <template v-if="activeOrgId">
               <NuxtLink :to="`/orgs/${activeOrgId}/accounts`">Contas</NuxtLink>
+              <NuxtLink :to="`/orgs/${activeOrgId}/sources`">Cortes</NuxtLink>
               <NuxtLink :to="`/orgs/${activeOrgId}/settings`">Configurações</NuxtLink>
             </template>
             <NuxtLink to="/orgs">Organizações</NuxtLink>

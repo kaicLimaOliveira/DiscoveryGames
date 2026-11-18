@@ -87,6 +87,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 3.1169.0
         version: 3.1169.0
+      '@central/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@nuxt/test-utils':
         specifier: 4.4.0
         version: 4.4.0(ca0abf6371b653dbf42b0d81d2cbe9ba)

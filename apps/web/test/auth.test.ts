@@ -315,6 +315,9 @@ describe('cabeçalhos', () => {
     expect(res.headers.get('x-content-type-options')).toBe('nosniff')
     expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
     expect(res.headers.get('content-security-policy')).toContain("default-src 'self'")
+    // O storage (envio multipart e player) precisa estar em connect-src e media-src.
+    expect(res.headers.get('content-security-policy')).toMatch(/connect-src 'self' http\S+/)
+    expect(res.headers.get('content-security-policy')).toMatch(/media-src 'self' blob: http\S+/)
     expect(res.headers.get('strict-transport-security')).toContain('max-age=')
     expect(res.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/)
   })

@@ -5,7 +5,11 @@ const { orgs, activeOrgId } = useOrgs()
 async function change(event: Event) {
   const id = (event.target as HTMLSelectElement).value
   if (!id) return
-  const section = route.path.endsWith('/settings') ? 'settings' : 'accounts'
+  const section = route.path.endsWith('/settings')
+    ? 'settings'
+    : route.path.includes('/sources')
+      ? 'sources'
+      : 'accounts'
   await navigateTo(`/orgs/${id}/${section}`)
 }
 </script>

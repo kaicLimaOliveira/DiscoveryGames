@@ -1,3 +1,5 @@
+import type { Me } from './useMe'
+
 export interface OrganizationSummary {
   id: string
   name: string
@@ -66,4 +68,24 @@ export function useCanManageOrg(orgId: MaybeRefOrGetter<string | null>) {
     const id = toValue(orgId)
     return me.value.memberships.some((m) => m.organizationId === id && m.role === 'admin')
   })
+}
+
+const ROLE_RANK = { viewer: 0, editor: 1, approver: 2, admin: 3 } as const
+
+function hasRole(me: Me | null, orgId: string | null, min: keyof typeof ROLE_RANK): boolean {
+  if (!me) return false
+  if (me.isAdmin) return true
+  const m = me.memberships.find((x) => x.organizationId === orgId)
+  return !!m && ROLE_RANK[m.role] >= ROLE_RANK[min]
+}
+
+/** Só para esconder ações na UI; a permissão de verdade é checada no servidor. */
+export function useCanEditOrg(orgId: MaybeRefOrGetter<string | null>) {
+  const me = useMe()
+  return computed(() => hasRole(me.value, toValue(orgId), 'editor'))
+}
+
+export function useCanApproveOrg(orgId: MaybeRefOrGetter<string | null>) {
+  const me = useMe()
+  return computed(() => hasRole(me.value, toValue(orgId), 'approver'))
 }

@@ -98,6 +98,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     process.env.E2E_ADMIN_EMAIL = adminEmail
     process.env.E2E_ADMIN_PASSWORD = ADMIN_PASSWORD
     process.env.E2E_ADMIN_TOTP_SECRET = totpSecret
+    process.env.E2E_DATABASE_URL = db.url
 
     await build
     const logs: string[] = []
