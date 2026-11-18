@@ -545,6 +545,44 @@ describe('source-service: leitura, direitos e retry', () => {
     expect(await jobs('source.analyze', view.id)).toBe(0)
   })
 
+  it('retry de link já baixado (original no storage, sem asset) reenvia a análise, não o download', async () => {
+    const p = db!.prisma
+    const view = await svc.createFromLink(
+      editorA,
+      orgA,
+      { title: 'x', url: YT, rights: OWN },
+      { linkEnabled: true },
+    )
+    await p.$executeRawUnsafe(`delete from pgboss.job`)
+    const key = `orgs/${orgA}/sources/${view.id}/original.mp4`
+    await putTo(await storage.presignPut(key, 'video/mp4'), new Uint8Array(16), 'video/mp4')
+    await p.source.update({
+      where: { id: view.id },
+      data: { status: 'failed', statusDetail: 'erro', uploadKey: key },
+    })
+    await svc.retry(editorA, orgA, view.id)
+    expect(await jobs('source.analyze', view.id)).toBe(1)
+    expect(await jobs('source.download', view.id)).toBe(0)
+  })
+
+  it('retry de link com uploadKey cujo arquivo sumiu volta ao download', async () => {
+    const p = db!.prisma
+    const view = await svc.createFromLink(
+      editorA,
+      orgA,
+      { title: 'x', url: YT, rights: OWN },
+      { linkEnabled: true },
+    )
+    await p.$executeRawUnsafe(`delete from pgboss.job`)
+    await p.source.update({
+      where: { id: view.id },
+      data: { status: 'failed', uploadKey: `orgs/${orgA}/sources/${view.id}/sumiu.mp4` },
+    })
+    await svc.retry(editorA, orgA, view.id)
+    expect(await jobs('source.download', view.id)).toBe(1)
+    expect(await jobs('source.analyze', view.id)).toBe(0)
+  })
+
   it('retry de upload cujo arquivo sumiu lança ValidationError', async () => {
     const p = db!.prisma
     const { created, parts } = await uploadParts([PART, 1024], 2 * PART)

@@ -690,8 +690,12 @@ export function createSourceService(deps: {
           'Só é possível tentar de novo uma fonte com falha ou bloqueada pelo orçamento.',
         )
       }
-      // Sem asset: link volta ao download; upload volta à análise, se o arquivo ainda existe.
-      const download = !source.mediaAssetId && source.kind === 'youtube_link'
+      // Sem asset: link volta ao download (a menos que o original já baixado ainda esteja no
+      // storage); upload volta à análise, se o arquivo ainda existe.
+      const linkWithoutAsset = !source.mediaAssetId && source.kind === 'youtube_link'
+      const downloaded =
+        linkWithoutAsset && !!source.uploadKey && !!(await storage.head(source.uploadKey))
+      const download = linkWithoutAsset && !downloaded
       if (download && source.rightsBasis === 'none') throw new ValidationError(LINK_NONE)
       if (!source.mediaAssetId && source.kind === 'upload') {
         if (!source.uploadKey || !(await storage.head(source.uploadKey))) {
