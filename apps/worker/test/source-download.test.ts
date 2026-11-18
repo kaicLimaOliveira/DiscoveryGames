@@ -144,6 +144,9 @@ it('link válido: baixa, sobe ao storage e enfileira a análise', async () => {
 
   const [meta, download] = await calls()
   expect(meta).toContain('--dump-single-json')
+  for (const args of [meta, download]) {
+    expect(args).toEqual(expect.arrayContaining(['--ignore-config', '--no-cache-dir']))
+  }
   expect(download).toEqual(
     expect.arrayContaining(['--no-playlist', '--merge-output-format', 'mp4']),
   )

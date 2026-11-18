@@ -36,6 +36,8 @@ export const MSG = {
 
 const STARTABLE: SourceStatus[] = ['queued', 'downloading']
 const FORMAT = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]'
+/** Ignora arquivos de configuração do ambiente e não grava cache (o root do container é read-only). */
+const BASE_ARGS = ['--ignore-config', '--no-cache-dir']
 
 /** Fim do download com mensagem para a UI: a fonte vira `failed` e o job termina sem erro. */
 class Stop extends Error {}
@@ -50,7 +52,7 @@ export function createSourceDownloadHandler(deps: SourceDownloadDeps) {
   const { db, storage, queue, scratchRoot } = deps
   const prefix = deps.ytdlpArgs ?? []
   const ytdlp = (args: string[], timeoutMs: number) =>
-    runTool(deps.ytdlpPath, [...prefix, ...args], { timeoutMs })
+    runTool(deps.ytdlpPath, [...prefix, ...BASE_ARGS, ...args], { timeoutMs })
 
   return async (job: SourceDownloadJob): Promise<void> => {
     const { sourceId } = job.data

@@ -74,6 +74,13 @@ services:
       ANTHROPIC_API_KEY:
       GROQ_API_KEY:
       AI_MODEL:
+      # Download por link (YTDLP_ENABLED=true liga a fila source.download; o YTDLP_PATH da imagem
+      # vale quando a chave não vem do ambiente).
+      YTDLP_ENABLED:
+      YTDLP_PATH:
+      # ❓ O yt-dlp_linux é um binário PyInstaller "one-file" que se extrai em TMPDIR; o /tmp pode
+      # ser tmpfs noexec. O scratch é um volume gravável (a varredura do worker apaga as sobras).
+      TMPDIR: /scratch
     volumes:
       - scratch:/scratch
     healthcheck:
