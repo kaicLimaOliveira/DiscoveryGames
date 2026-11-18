@@ -47,6 +47,14 @@ const SENSITIVE_KEYS = new Set(
   ].map(normalizeKey),
 )
 
+// Sufixos que marcam segredo mesmo fora da lista (pageAccessToken, googleRefreshToken, x-api-key).
+// `tokenType`, `maxTokens` e afins não terminam em sufixo sensível e passam.
+const SENSITIVE_SUFFIXES = ['token', 'secret', 'password', 'apikey', 'credential'] as const
+const isSensitiveKey = (key: string): boolean => {
+  const k = normalizeKey(key)
+  return SENSITIVE_KEYS.has(k) || SENSITIVE_SUFFIXES.some((suffix) => k.endsWith(suffix))
+}
+
 // `code` (OAuth) só é segredo em objetos com formato de requisição; um `*.code` genérico
 // apagaria códigos de erro (ECONNREFUSED, P2002) de `err.code`.
 const REQUEST_PARENTS = ['query', 'body', 'params'] as const
@@ -86,7 +94,7 @@ function scrub(value: unknown, depth: number): unknown {
   if (depth > 0 && isPlainObject(value)) {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(value)) {
-      out[k] = SENSITIVE_KEYS.has(normalizeKey(k)) ? CENSOR : scrub(v, depth - 1)
+      out[k] = isSensitiveKey(k) ? CENSOR : scrub(v, depth - 1)
     }
     return out
   }

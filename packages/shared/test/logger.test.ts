@@ -160,4 +160,30 @@ describe('logger', () => {
     for (const v of ['SECRET1', 'SECRET2', 'SECRET3']) expect(out).not.toContain(v)
     expect(out).toContain('fields=id')
   })
+
+  it('redige chaves com sufixo sensível (pageAccessToken, googleRefreshToken, x-api-key)', () => {
+    const { lines, log } = capture()
+    log.info(
+      {
+        pageAccessToken: 'S1',
+        nested: { googleRefreshToken: 'S2', headers: { 'x-api-key': 'S3' }, dbPassword: 'S4' },
+        metaAppSecret: 'S5',
+        accountCredential: 'S6',
+      },
+      'x',
+    )
+    expect(lines.join('')).not.toMatch(/S[1-6]/)
+  })
+
+  it('não redige em excesso: tokenType, err.code e campos normais ficam', () => {
+    const { lines, log } = capture()
+    const err = Object.assign(new Error('falhou'), { code: 'ECONNREFUSED' })
+    log.info({ tokenType: 'Bearer', maxTokens: 10, platform: 'meta', err }, 'x')
+    const j = JSON.parse(lines[0]!)
+    expect(j.tokenType).toBe('Bearer')
+    expect(j.maxTokens).toBe(10)
+    expect(j.platform).toBe('meta')
+    expect(j.err.code).toBe('ECONNREFUSED')
+    expect(j.err.message).toBe('falhou')
+  })
 })
