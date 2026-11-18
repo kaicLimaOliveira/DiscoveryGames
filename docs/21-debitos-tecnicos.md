@@ -35,6 +35,14 @@
 
 **Observação:** a primeira entrega já tem download de vídeo e cópia de texto em todas as redes (fallback manual). O D2 formaliza isso como um modo configurável.
 
+## D3 — Fallback de transcrição
+
+**Registrado em:** 2026-11-18, ao fechar a Fase 3. **Estado:** adiado.
+
+Sem fallback de transcrição nesta fase. O fallback previsto em docs/04 (`gpt-4o-mini-transcribe`) ❓ não tem timestamp por palavra; a interface aceita uma cadeia, mas só o Groq é implementado.
+
+**Efeito hoje:** se o Groq falhar depois das tentativas, a fonte fica `failed` e o usuário usa "Tentar de novo". Os candidatos dependem do timestamp por palavra, então um fallback só serve se entregar isso (ou se aceitarmos candidatos só pelos sinais técnicos).
+
 ## Outros itens adiados no refinamento de 2026-11-17
 
 - **Plano B do cortador:** trocar o motor híbrido por uma API de cortes de terceiros (ex.: Vizard, Klap; preço e termos a confirmar) se a qualidade não bastar.

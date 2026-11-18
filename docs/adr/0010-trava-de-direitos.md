@@ -24,4 +24,4 @@
   - A trava depende de honestidade: a Central registra **quem declarou**, e a responsabilidade é do declarante (risco 5 da spec §10); a UI explica as consequências.
   - Fonte `none` serve para estudo e não gera publicação.
   - Cada ponto de saída (publicar, agendar, baixar) precisa passar pela mesma checagem de servidor.
-  - A implementação é da Fase 3 em diante; **nada disso existe ainda no código** (a Fase 2 trata de organizações e contas).
+  - **Estado (Fase 3):** entregues a declaração obrigatória por fonte, as regras por categoria no servidor, o anexo de evidência, os criadores parceiros por organização, o histórico versionado e auditado da declaração (mudança restrita a aprovador e administrador), a recusa do link do YouTube com `none` antes do download e a função `assertPublishable`, que recusa fonte `none`. **Ficam para as Fases 4 e 5:** chamar `assertPublishable` nos pontos de saída (a recusa do download do corte na Fase 4; publicar e agendar na Fase 5), os créditos ao criador na legenda e o bloqueio das publicações agendadas ao reclassificar para `none`, que só fazem sentido quando existirem cortes e agendamentos.

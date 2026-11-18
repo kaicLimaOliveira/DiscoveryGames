@@ -129,9 +129,11 @@ Campos da automação ([11 §7](11-agendamento.md)): `scheduleId` (FK `PostingSc
 
 **AuditLog** — `id`, `organizationId`, `userId` (nulo = sistema), `action` (ex.: `publication.approved`, `account.connected`, `setting.updated`), `entityType`, `entityId`, `diff` (jsonb, sem segredos), `ip`, `at`.
 
-### 2.7 Entidades do cortador (desenho das Fases 3 a 5; ainda não implementadas)
+### 2.7 Entidades do cortador (Fase 3 implementada; `Clip` fica para a Fase 4)
 
-Delta definido na [spec §7](superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md):
+Delta definido na [spec §7](superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md).
+
+**Implementadas na Fase 3** (migração `20261118150000_cutter`): `Source`, `RightsDeclaration`, `PartnerCreator`, `MediaAsset` (só `kind = original`), `Transcript`, `AiRun`, `CostLedger` e `ClipCandidate`. Diferenças em relação ao desenho: a declaração de direitos vigente fica copiada em `Source.rightsBasis` e o histórico imutável em `RightsDeclaration` (uma linha por declaração, nunca alterada); o `Transcript` guarda as palavras com início e fim em ms (`[{w,s,e}]`), um por fonte; o `AiRun` serve de cache (`task`, `inputHash`, `promptVersion`, `model`); `ClipCandidate` guarda `startMs`/`endMs` (ajustáveis) e `suggestedStartMs`/`suggestedEndMs` (o que a IA propôs). `Clip` e as renditions (`MediaAsset` por rede) são da Fase 4.
 
 | Entidade | Mudança |
 |---|---|
@@ -140,7 +142,7 @@ Delta definido na [spec §7](superpowers/specs/2026-11-17-organizacoes-e-cortado
 | `Source` (novo) | O vídeo longo: organização, tipo (`upload`/`youtube_link`), URL, `MediaAsset` original, declaração de direitos (`own`/`authorized`/`cc_license`/`clipper_program`/`none`), evidência, `partnerCreatorId?`, status do processamento ([ADR 0010](adr/0010-trava-de-direitos.md)) |
 | `PartnerCreator` (novo) | Criador parceiro por organização: nome, canais, autorização |
 | `ClipCandidate` (novo) | Fonte, início e fim, nota, motivo, layout, textos sugeridos, status (`suggested`/`accepted`/`rejected`/`rendered`) |
-| `Clip` (novo) | Corte renderizado: candidato, `MediaAsset` por rede, hash; é a unidade que vira `Publication` |
+| `Clip` (novo, Fase 4) | Corte renderizado: candidato, `MediaAsset` por rede, hash; é a unidade que vira `Publication` |
 | `Transcript`, `MediaProbe`, `AiRun`, `CostLedger`, `Publication`, `PublishAttempt`, `Approval` | Já desenhadas, reaproveitadas ([ADR 0008](adr/0008-cortador-hibrido.md)) |
 
 ## 3. Índices e restrições importantes

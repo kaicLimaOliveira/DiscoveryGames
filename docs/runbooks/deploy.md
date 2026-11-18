@@ -50,10 +50,14 @@ Copiar `.env.example` para `/opt/central/.env` e `chmod 600`. Os valores do exem
 | `META_APP_ID`, `META_APP_SECRET`, `META_GRAPH_VERSION` | **opcionais**, mas as três juntas: sem qualquer uma, a conexão Meta responde 503 "Integração não configurada" e o resto do painel funciona. `META_GRAPH_VERSION` (formato `vNN.N`) não tem valor padrão. Passo a passo: [meta-app.md](meta-app.md) |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | **opcionais**, mas as duas juntas, senão a conexão do YouTube responde 503. O redirect cadastrado no Google é `${APP_ORIGIN}/api/oauth/youtube/callback`. Passo a passo: [google-oauth.md](google-oauth.md) |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | dados do bucket R2 |
+| `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `AI_MODEL` | **opcionais**, só o **worker** usa. Sem as **duas** chaves a análise de vídeo termina em "Integração de IA não configurada." e o resto do painel funciona. `AI_MODEL` padrão `claude-opus-5-5` (precisa ter preço em `packages/ai/src/pricing.ts`). Nunca aparecem em logs nem em respostas |
+| `YTDLP_ENABLED`, `YTDLP_PATH` | **opcionais**, padrão desligado. Liga o envio por link do YouTube (o worker baixa com `yt-dlp`; o web só mostra a opção). Ferramenta não oficial: pode violar os termos do YouTube e ter o IP bloqueado; o MP4 enviado continua sendo o caminho garantido. Na imagem do worker o binário já vem em `/usr/local/bin/yt-dlp` |
 | `IMAGE_OWNER` | owner do GitHub **em minúsculas** (mesmo usado no `images.yml`) |
 | `IMAGE_TAG` | tag a implantar: `sha-<curto>` ou a versão (`1.2.3`). Evitar `latest`/`edge` em produção |
 
 As variáveis `MINIO_*` valem só para o compose de desenvolvimento.
+
+**CORS do bucket:** o envio de vídeo vai direto do navegador ao R2. Antes de usar a tela **Cortes**, aplique a regra de [storage-cors.md](storage-cors.md) (origem do painel, `PUT` e `GET`, `ExposeHeaders: ETag`); sem ela o envio falha.
 
 As variáveis `META_*` e `GOOGLE_OAUTH_*` podem ficar ausentes ou vazias (vazio equivale a não definido); o compose só as repassa ao `web` quando existem. Depois de alterá-las, recrie o web: `docker compose -f compose.prod.yaml --env-file .env up -d web`.
 

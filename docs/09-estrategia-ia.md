@@ -80,6 +80,15 @@ Transcrição: LLMs de texto da Anthropic não transcrevem áudio. Usa-se um ser
 
 - SQL agrega métricas por plataforma/jogo/categoria/horário → resumo numérico compacto → Batch API (custo 50%) → relatório com recomendações ("curiosidades de jogo X performam 2× melhor no TikTok às 19h"). Sempre exibir os números de base junto com a recomendação.
 
+### 3.7 `select_clips` — candidatos a corte (Fase 3)
+
+- **Quando:** análise de uma `Source` (cortador, [ADR 0008](adr/0008-cortador-hibrido.md)), depois da transcrição e dos sinais técnicos. Uma chamada por fonte; ajustar início e fim de um candidato **não** chama a IA de novo.
+- **Entrada:** duração; idioma e parâmetros do pedido (quantidade alvo e faixa de duração, com padrão em `Organization.clipDefaults`); nome, tags e guia de voz da organização; transcrição com timestamps por palavra (agrupada em janelas de ~10 s; vazia quando não há fala, o que é sinal e não erro); sinais técnicos (picos de volume, cortes de cena, movimento); quadros amostrados.
+- **Saída (validada por schema, zod):** lista de candidatos com `startSec`, `endSec`, `hookScore` (0 a 100), `reason` (uma frase), `title`, `layout` (`face`, `center`, `game_facecam` ou `blur_fit`), `hashtags` (até 8, sem `#`, sem repetir), legenda do Instagram, do Facebook e do TikTok e título e descrição do YouTube. Depois do schema, uma validação determinística descarta trechos fora do vídeo ou da faixa de duração e os que se sobrepõem demais (mantém os de maior nota), e limita à quantidade alvo.
+- **Prompt:** `packages/ai/prompts/select-clips/v1.md`; a versão é gravada em cada `AiRun` (`promptVersion`).
+- **Robustez e custo:** saída inválida ou chamada com erro é repetida com limite. O resultado é reaproveitado do `AiRun` quando `task`, `inputHash`, `promptVersion` e `model` coincidem. Cada chamada vai para o `CostLedger`; o orçamento mensal da organização (`aiMonthlyBudgetUsd`, padrão US$ 50, alerta em 80%) cobre Claude e Groq. Se a estimativa de uma nova análise passar do saldo, a fonte fica `blocked_budget`; análises em andamento terminam.
+- **Modelo:** `AI_MODEL` (padrão `claude-opus-5-5`), que precisa ter preço cadastrado em `packages/ai/src/pricing.ts`. A saída estruturada da Anthropic não aceita algumas palavras-chave do JSON Schema (limites de tamanho, `pattern`...): elas saem do schema enviado ao modelo e continuam valendo na validação do lado do servidor.
+
 ## 4. Engenharia de prompts e qualidade
 
 | Prática | Detalhe |

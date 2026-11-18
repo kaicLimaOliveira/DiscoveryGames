@@ -46,11 +46,13 @@ Prazos de aprovação das plataformas não são controláveis; começar cedo evi
 
 **Escopo:** fonte (MP4 ou link do YouTube, `Source`) com **trava de direitos** ([ADR 0010](adr/0010-trava-de-direitos.md)); ffprobe; transcrição (`Transcriber`, Groq + fallback); sinais técnicos e amostragem de quadros; Claude escolhe os trechos ([ADR 0008](adr/0008-cortador-hibrido.md)); `ClipCandidate` com título e legenda por rede; `CostLedger` e orçamento por organização; tela de Cortes (aceitar, rejeitar, ajustar início e fim).
 
+**Estado:** código e testes automáticos entregues no ramo `fase-3-cortador` (API, worker, telas e [runbook de CORS](runbooks/storage-cors.md)); **ainda não integrado à `main`**. Falta a validação do dono na VPS, com `ANTHROPIC_API_KEY` e `GROQ_API_KEY` reais: os dois primeiros critérios abaixo e a conferência do custo contra os painéis da Anthropic e da Groq. Sem fallback de transcrição ([docs/21](21-debitos-tecnicos.md), D3).
+
 **Critérios de aceite** (spec §11):
 - [ ] Um MP4 de 30 a 60 min com fala gera pelo menos 5 candidatos com título e legenda por rede em menos de 15 min na VPS de referência.
 - [ ] Uma gameplay sem fala gera candidatos usando os sinais técnicos.
-- [ ] Uma fonte `none` gera cortes, mas a API recusa a publicação e o download (teste).
-- [ ] O custo de IA de cada fonte aparece no `CostLedger`; o orçamento estourado bloqueia novas análises.
+- [ ] Uma fonte `none` gera cortes, mas a API recusa a publicação e o download (teste). Nesta fase só `assertPublishable` está pronto; os pontos de saída (download do corte, publicar, agendar) chegam nas Fases 4 e 5.
+- [x] O custo de IA de cada fonte aparece no `CostLedger`; o orçamento estourado bloqueia novas análises (testes do worker).
 
 ## Fase 4 — Cortador: renderização
 
