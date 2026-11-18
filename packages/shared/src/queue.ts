@@ -6,6 +6,8 @@ export const QUEUES = {
   systemEcho: 'system.echo',
   sourceAnalyze: 'source.analyze',
   sourceDownload: 'source.download',
+  /** Fila de mortos de `source.analyze` e `source.download` (job que esgotou os retries). */
+  sourceDeadLetter: 'source.dead_letter',
 } as const
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
 

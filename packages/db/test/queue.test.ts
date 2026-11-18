@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { PgBoss } from 'pg-boss'
 import { QUEUES, type QueueName } from '@central/shared'
 import { createPgBossQueue, sqlExecutorFor, type PgBossQueue } from '../src/queue/pgboss-queue.js'
 import { startTestDatabase } from '../src/testing.js'
@@ -104,3 +105,86 @@ it('ping funciona pelo pg-boss', async () => {
   const q = await newQueue('web')
   await expect(q.ping()).resolves.toBeUndefined()
 })
+
+it('source.analyze e source.download recebem expiração, heartbeat, retry e fila de mortos (inclusive em banco já implantado)', async () => {
+  const legacy = new PgBoss({
+    connectionString: db!.url,
+    schema: 'pgboss',
+    supervise: false,
+    schedule: false,
+  })
+  await legacy.start()
+  try {
+    // Banco "antigo": as filas existem com os padrões do pg-boss (createQueue não as alteraria).
+    for (const name of [QUEUES.sourceAnalyze, QUEUES.sourceDownload]) {
+      if (!(await legacy.getQueue(name))) await legacy.createQueue(name, { policy: 'exclusive' })
+      await legacy.updateQueue(name, {
+        expireInSeconds: 900,
+        heartbeatSeconds: null,
+        retryDelay: 0,
+        retryBackoff: false,
+        deadLetter: null,
+      })
+    }
+    expect(await legacy.getQueue(QUEUES.sourceAnalyze)).toMatchObject({
+      expireInSeconds: 900,
+      heartbeatSeconds: null,
+    })
+
+    await newQueue('worker')
+    for (const name of [QUEUES.sourceAnalyze, QUEUES.sourceDownload]) {
+      expect(await legacy.getQueue(name)).toMatchObject({
+        policy: 'exclusive',
+        expireInSeconds: 10_800,
+        heartbeatSeconds: 60,
+        retryLimit: 2,
+        retryDelay: 60,
+        retryBackoff: true,
+        deadLetter: QUEUES.sourceDeadLetter,
+      })
+    }
+    expect(await legacy.getQueue(QUEUES.sourceDeadLetter)).toMatchObject({ policy: 'standard' })
+  } finally {
+    await legacy.stop({ graceful: false })
+  }
+})
+
+it('hasPendingJob vê job criado com a chave e ignora job concluído', async () => {
+  const q = await newQueue('worker', {
+    extraQueues: [{ name: 'test.pending', policy: 'exclusive' }],
+  })
+  const name = 'test.pending' as QueueName
+  expect(await q.hasPendingJob([name], 'p1')).toBe(false)
+  await q.send(name, { n: 1 }, { singletonKey: 'p1' })
+  expect(await q.hasPendingJob([QUEUES.systemEcho, name], 'p1')).toBe(true)
+  expect(await q.hasPendingJob([name], 'p2')).toBe(false)
+  const done = new Promise<void>((res) => {
+    void q.work<object>(name, async () => res())
+  })
+  await done
+  await vi.waitFor(async () => expect(await q.hasPendingJob([name], 'p1')).toBe(false))
+})
+
+it('job que esgota os retries vai para a fila de mortos com o mesmo payload', async () => {
+  const q = await newQueue('worker', {
+    extraQueues: [
+      { name: 'test.dead', policy: 'standard' },
+      {
+        name: 'test.dying',
+        policy: 'exclusive',
+        options: { retryLimit: 1, retryDelay: 1, deadLetter: 'test.dead' },
+      },
+    ],
+  })
+  let runs = 0
+  await q.work<object>('test.dying' as QueueName, async () => {
+    runs++
+    throw new Error('falha')
+  })
+  const dead = new Promise<object>((res) => {
+    void q.work<object>('test.dead' as QueueName, async (j) => res(j.data))
+  })
+  await q.send('test.dying' as QueueName, { sourceId: 's1' }, { singletonKey: 's1' })
+  await expect(dead).resolves.toEqual({ sourceId: 's1' })
+  expect(runs).toBe(2)
+}, 30_000)
