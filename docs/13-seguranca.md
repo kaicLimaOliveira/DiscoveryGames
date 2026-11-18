@@ -38,7 +38,7 @@ Regras:
 | 2FA | TOTP obrigatório para `admin` e `approver` |
 | Sessão | Cookie selado (`HttpOnly`, `Secure`, `SameSite=Lax`), expiração 12 h deslizante, revogação ao trocar senha |
 | Força bruta | Rate limit por IP e por e-mail no login (ex.: 5 tentativas / 15 min) |
-| Autorização | Verificação de papel **no servidor** em toda rota (`requireRole('approver')`) + filtro por `brandId` via `BrandMember` |
+| Autorização | Verificação de papel **no servidor** em toda rota (`requireRole('approver')`) + filtro por `organizationId` via `OrganizationMember` |
 | CSRF | `SameSite=Lax` + verificação de `Origin` em métodos mutáveis |
 | Auditoria | `AuditLog` para login, aprovar, publicar, cancelar, conectar/desconectar conta, alterar configurações, ver logs de erro |
 
@@ -60,7 +60,7 @@ Matriz de permissões:
 - **PKCE** (`S256`) quando a plataforma suporta.
 - `redirect_uri` fixos e registrados; nenhum parâmetro de redirecionamento aberto.
 - Solicitar **somente** os escopos necessários; registrar `grantedScopes` e alertar se faltar algum.
-- Após o callback, confirmar que a conta/página/canal escolhido pertence ao conjunto permitido da marca.
+- Após o callback, confirmar que a conta/página/canal escolhido pertence ao conjunto permitido da organização.
 
 ## 5. Arquivos e mídia
 

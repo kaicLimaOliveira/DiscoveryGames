@@ -142,10 +142,10 @@ sequenceDiagram
 | Fonte da verdade | PostgreSQL. A fila é um mecanismo de execução; o estado de negócio vive nas tabelas de domínio |
 | Estados | State machines explícitas para `Content` e `Publication` (ver [06](06-fluxos.md)) com transições validadas no `core` |
 | Transações | Mudança de estado + enfileiramento na **mesma transação** (pg-boss aceita a conexão/transação do chamador), evitando "estado mudou mas job não foi criado" |
-| Tempo | Tudo em UTC no banco; conversão para o timezone da marca só na borda (UI/relatórios) |
+| Tempo | Tudo em UTC no banco; conversão para o timezone da organização só na borda (UI/relatórios) |
 | Erros | Hierarquia: `TransientError`, `RateLimitError(retryAfter)`, `PermanentError`, `AuthError` (reconectar conta), `PolicyError`, `UnknownOutcomeError` |
 | Configuração | Variáveis de ambiente validadas na inicialização (zod); configuração de negócio no banco (`Setting`) editável pelo painel |
-| Multi-marca | Toda entidade de negócio carrega `brandId`; consultas sempre filtradas por marca |
+| Multi-organização | Toda entidade de negócio carrega `organizationId`; consultas sempre filtradas por organização |
 | Extensibilidade | Registro de adaptadores (`platformRegistry`) e de formatos (`formatRegistry`) carregados na inicialização |
 
 ## 8. Quando evoluir a arquitetura (gatilhos)
@@ -154,5 +154,5 @@ sequenceDiagram
 |---|---|
 | > ~20 vídeos/dia ou fila de mídia com espera > 15 min | Worker de mídia em máquina dedicada (mesma imagem, só a fila `media`) |
 | Necessidade de rate limiting distribuído complexo, prioridades finas, ou > 5 réplicas de worker | Migrar filas para Redis + BullMQ (interface de fila no `core` isola essa troca) |
-| Várias marcas com equipes distintas | Ativar UI multi-marca e permissões por marca (o modelo já suporta) |
+| Várias organizações com equipes distintas | Ativar UI multi-organização e permissões por organização (o modelo já suporta) |
 | Oferecer para terceiros | Reavaliar: multi-inquilino, revisão de apps nas plataformas como produto público, termos, faturamento — **novo projeto de arquitetura** |

@@ -58,10 +58,10 @@ Transcrição: LLMs de texto da Anthropic não transcrevem áudio. Usa-se um ser
 ### 3.3 `generate_copy` — textos por plataforma
 
 - **Uma única chamada** gera as quatro plataformas: contexto compartilhado (mais barato e mais consistente).
-- **Entrada:** saída do `analyze`, fatos verificados, guia de voz da marca (`Brand.voiceGuide`), hashtags oficiais do jogo, regras de cada plataforma **fornecidas pelo adaptador** (limites de caracteres, nº máximo de hashtags, convenções), formatos selecionados.
+- **Entrada:** saída do `analyze`, fatos verificados, guia de voz da organização (`Organization.voiceGuide`), hashtags oficiais do jogo, regras de cada plataforma **fornecidas pelo adaptador** (limites de caracteres, nº máximo de hashtags, convenções), formatos selecionados.
 - **Saída:** `{ instagram: {caption, hashtags[]}, facebook: {description, hashtags[]}, tiktok: {caption, hashtags[]}, youtube: {title, description, tags[], hashtags[]} , titleVariants[] }` — somente as plataformas selecionadas.
-- **Pós-processamento determinístico:** contagem de caracteres (na unidade que cada plataforma mede: caracteres vs bytes), número de hashtags, termos proibidos da marca, ausência de menções a outras plataformas ("link na bio do TikTok" no Instagram etc.). Violação → 1 tentativa de correção focada → se persistir, salva com alerta para o humano.
-- **Diretrizes por rede** (ponto de partida; o guia de voz da marca prevalece):
+- **Pós-processamento determinístico:** contagem de caracteres (na unidade que cada plataforma mede: caracteres vs bytes), número de hashtags, termos proibidos da organização, ausência de menções a outras plataformas ("link na bio do TikTok" no Instagram etc.). Violação → 1 tentativa de correção focada → se persistir, salva com alerta para o humano.
+- **Diretrizes por rede** (ponto de partida; o guia de voz da organização prevalece):
   - Instagram: gancho na primeira linha, CTA para comentar/salvar, hashtags no fim, poucas e relevantes.
   - Facebook: texto um pouco mais explicativo; hashtags com moderação.
   - TikTok: curto, linguagem da plataforma, hashtags de nicho + jogo.
@@ -105,7 +105,7 @@ Transcrição: LLMs de texto da Anthropic não transcrevem áudio. Usa-se um ser
 
 | Mecanismo | Detalhe |
 |---|---|
-| Orçamento mensal por marca | `Brand.aiMonthlyBudgetUsd`; alerta em 80%; em 100% bloqueia tarefas opcionais (`weekly-insights`, variações) e exige confirmação de admin para as essenciais |
+| Orçamento mensal por organização | `Organization.aiMonthlyBudgetUsd`; alerta em 80%; em 100% bloqueia tarefas opcionais (`weekly-insights`, variações) e exige confirmação de admin para as essenciais |
 | Ledger | Cada chamada grava `CostLedger` com custo calculado a partir de `usage` |
 | Tamanho de entrada | Transcrição limitada (vídeos curtos já são pequenos); quadros reduzidos; sem enviar o vídeo inteiro ao LLM |
 | Effort | `low` para tarefas mecânicas, `medium` para copy e fact-check |

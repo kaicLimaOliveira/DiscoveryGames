@@ -4,7 +4,7 @@
 
 1. **O banco é a fonte da verdade.** Um agendamento é `Publication.status = 'scheduled'` + `scheduledAt` (UTC). A fila apenas executa.
 2. **Horário por publicação**, portanto horário diferente por rede é natural.
-3. **Timezone por marca** (`Brand.timezone`, padrão `America/Sao_Paulo`). A UI converte; o banco guarda UTC. Usar biblioteca de timezone com base IANA (ex.: `Temporal` polyfill ou `date-fns-tz`); nunca offsets fixos (o Brasil já teve e pode voltar a ter horário de verão).
+3. **Timezone por organização** (`Organization.timezone`, padrão `America/Sao_Paulo`). A UI converte; o banco guarda UTC. Usar biblioteca de timezone com base IANA (ex.: `Temporal` polyfill ou `date-fns-tz`); nunca offsets fixos (o Brasil já teve e pode voltar a ter horário de verão).
 4. **Agendamento próprio, não nativo da plataforma** (decisão inicial). Motivos: um único mecanismo para as 4 redes; pausar/cancelar/editar funciona igual em todas; a aprovação e as pré-checagens acontecem perto do horário. Agendamento nativo (quando a API oferece, ex.: YouTube `publishAt`) fica como opção futura por adaptador — documentado em `07-integracoes/`.
 
 ## 2. Mecanismo
@@ -70,7 +70,7 @@ Arrastar e soltar reagenda (com confirmação), clique abre o editor da publica�
 - Matar o worker antes do horário, religar 1 min depois do horário → publica uma única vez.
 - Apagar a tabela de jobs do pg-boss com agendamentos pendentes → o tick recria e publica no horário.
 - Pausar 1 min antes → não publica; retomar após o horário → sistema pergunta o que fazer.
-- Mudar o timezone da marca → horários exibidos mudam, instantes em UTC permanecem.
+- Mudar o timezone da organização → horários exibidos mudam, instantes em UTC permanecem.
 
 ## 7. Grade recorrente e fila automática ("piloto automático")
 
@@ -106,14 +106,14 @@ Uma grade por conta social. Tipos de regra:
 | Semanal | IG: seg–sex às 12:00 e 19:00; sáb 15:00 | dias da semana × horários |
 | Intervalo | YT: a cada 8 h entre 09:00 e 23:00 | intervalo em horas + janela diária |
 
-- Horários no timezone da marca. Os instantes gerados são guardados em UTC.
+- Horários no timezone da organização. Os instantes gerados são guardados em UTC.
 - Pode ter início, fim e pausa (pausar a grade não afeta publicações agendadas à mão).
 - Na criação, o painel **valida a grade** contra o espaçamento mínimo e os limites diários conhecidos da plataforma (§4). Uma grade que gera mais posts por dia do que o limite é recusada.
 - A frequência é escolha editorial. A central não sugere números até haver histórico (sugestão por desempenho: RF-AGE-06, Fase 10).
 
 ### 7.3 Fila de conteúdos (`QueueEntry`)
 
-- Um conteúdo entra na fila quando ao menos uma das suas publicações é aprovada (opção da marca, padrão ligado).
+- Um conteúdo entra na fila quando ao menos uma das suas publicações é aprovada (opção da organização, padrão ligado).
 - **Ordem:**
   1. itens **fixados** num horário específico;
   2. **prioridade** (`urgent`, por exemplo uma notícia quente, ou `normal`);

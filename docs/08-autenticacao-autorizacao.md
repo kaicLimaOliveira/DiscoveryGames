@@ -9,7 +9,7 @@ Dois mundos distintos:
 
 - E-mail + senha (Argon2id), convite pelo admin, 2FA TOTP obrigatório para `admin`/`approver`.
 - Sessão em cookie selado (`nuxt-auth-utils`), 12 h deslizante.
-- Papéis por marca (`BrandMember.role`): `viewer`, `editor`, `approver`, `admin`. Checagem no servidor em toda rota.
+- Papéis por organização (`OrganizationMember.role`): `viewer`, `editor`, `approver`, `admin`. Checagem no servidor em toda rota.
 - Login social (Google Workspace) é opcional futuro; não necessário para poucos usuários.
 
 ## 2. Apps de desenvolvedor necessários (um de cada, para toda a operação)

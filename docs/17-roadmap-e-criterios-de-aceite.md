@@ -62,7 +62,7 @@ Prazos de aprovação das plataformas não são controláveis; começar cedo evi
 
 ## Fase 5 — Publicação (IG, FB e YouTube automáticos; TikTok manual)
 
-**Escopo:** adaptadores Instagram (Reels), Facebook (Reels, 3 a 90 s) e YouTube (Shorts) sobre as contas das organizações; `Publication`, aprovação, "publicar agora" e "agendar"; state machine, idempotência e reconciliação ([06](06-fluxos.md), [11](11-agendamento.md)); `QuotaUsage` e limite diário por conta; TikTok em modo manual assistido (baixar, copiar texto, colar URL); alerta quando o uso do dia passar de 80% do limite (YouTube: 100 uploads/dia por projeto). O pedido de aumento de cota só é feito se o volume somado das organizações se aproximar desse teto.
+**Escopo:** adaptadores Instagram (Reels), Facebook (Reels, 3 a 90 s) e YouTube (Shorts) sobre as contas das organizações; `Publication`, aprovação, "publicar agora" e "agendar"; state machine, idempotência e reconciliação ([06](06-fluxos.md), [11](11-agendamento.md)); `QuotaUsage` e limite diário por conta; TikTok em modo manual assistido (baixar, copiar texto, colar URL); alerta quando o uso do dia passar de 80% do limite (YouTube: 100 uploads/dia por projeto). O pedido de aumento de cota só é feito se o volume somado das organizações se aproximar desse teto. A "validade do token" na tela Contas e a saúde dos tokens Meta/YouTube (aviso de expiração, renovação) ficam para esta fase.
 
 **Pré-requisito:** resultado do teste Meta Live na ADR 0009. Se não for possível, IG e FB caem para manual assistido e o critério vira "publicação manual assistida funcionando, com o adaptador Meta pronto atrás de uma chave" ([spec §10](superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md)).
 

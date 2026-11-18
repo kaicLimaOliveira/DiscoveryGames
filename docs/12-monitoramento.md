@@ -61,7 +61,7 @@ Indicador principal recomendado para comparar conteúdos: **views em 72 h relati
 ### B.1 Logs
 
 - pino, JSON, nível `info` em produção.
-- Campos obrigatórios: `ts`, `level`, `service` (`web`|`worker`), `msg`, `requestId` ou `jobId`, e quando aplicável `brandId`, `contentId`, `publicationId`, `platform`, `step`, `attempt`, `durationMs`.
+- Campos obrigatórios: `ts`, `level`, `service` (`web`|`worker`), `msg`, `requestId` ou `jobId`, e quando aplicável `organizationId`, `contentId`, `publicationId`, `platform`, `step`, `attempt`, `durationMs`.
 - Redação de segredos ([13 §7](13-seguranca.md)).
 - Saída: stdout → `docker logs` com rotação (`max-size`); envio opcional para um agregador (Better Stack/Axiom/Grafana Loki) quando necessário.
 

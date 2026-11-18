@@ -39,7 +39,7 @@
 
 Estas entradas não são cobertas pelos testes de nenhuma tarefa por si só. Cada linha tem o seu teste na tarefa dona.
 
-1. **Acesso cruzado entre organizações.** Um membro da organização A chamando `/api/orgs/<B>/…` recebe 403. Um `accountId` da organização B pedido pelo caminho da organização A recebe **404**, nunca a conta de B. Testes nas Tasks 3 e 4.
+1. **Acesso cruzado entre organizações.** Um membro da organização A chamando `/api/orgs/<B>/…` recebe **404** (não revela que B existe); 403 é só para quem enxerga a organização e não tem a permissão. Um `accountId` da organização B pedido pelo caminho da organização A recebe **404**, nunca a conta de B. Testes nas Tasks 3 e 4.
 2. **Mesma conta externa em duas organizações.** A segunda vinculação recebe **409** "Esta conta já está vinculada a outra organização." e nada muda. Inclui Meta, YouTube e TikTok. O @ do TikTok é comparado sem `@` e em minúsculas. Testes nas Tasks 4, 5 e 6.
 3. **Token Meta inválido ou expirado, ou Página sem Instagram vinculado.** Recebe **422** com mensagem clara e nada é gravado. Página sem IG pode ser vinculada só como Facebook, se o usuário confirmar. Testes na Task 5.
 4. **Callback OAuth do Google problemático:** `state` inexistente, expirado, já usado ou de outro usuário, `error=access_denied`, ou resposta sem `refresh_token`. Em todos os casos o callback é recusado, nada é gravado e o usuário volta para a tela de contas com o motivo. Testes na Task 6.
