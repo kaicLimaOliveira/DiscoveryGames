@@ -39,9 +39,9 @@ jobs:
       # executar nenhuma suíte duas vezes. O Testcontainers usa o Docker do runner.
       - name: Testes com cobertura (core, platforms)
         run: pnpm --filter @central/core --filter @central/platforms test:coverage
-      - name: Testes (shared, db, storage, media, worker)
+      - name: Testes (shared, db, storage, media, ai, worker)
         run: >-
-          pnpm --filter @central/shared --filter @central/db --filter @central/storage --filter @central/media
+          pnpm --filter @central/shared --filter @central/db --filter @central/storage --filter @central/media --filter @central/ai
           --filter @central/worker test
       - run: pnpm test:web
 
