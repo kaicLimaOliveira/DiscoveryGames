@@ -2,7 +2,6 @@ import type { CostCategory, Db, DbOrTx } from '@central/db'
 import { writeAudit } from '../audit.js'
 import { requireOrgAccess } from '../authz/org-access.js'
 import type { Actor } from '../authz/roles.js'
-import { isUniqueViolation } from '../db-errors.js'
 import { NotFoundError } from '../errors.js'
 
 /** Fração do orçamento que dispara o alerta. */
@@ -90,11 +89,8 @@ export async function recordCost(
   entry: CostEntry,
   opts: { logger?: BudgetLogger } = {},
 ): Promise<void> {
-  try {
-    await db.costLedger.create({ data: entry })
-  } catch (err) {
-    if (!isUniqueViolation(err)) throw err
-  }
+  // ON CONFLICT DO NOTHING: um INSERT que falha abortaria a transação do chamador (25P02).
+  await db.costLedger.createMany({ data: [entry], skipDuplicates: true })
 
   const maybeAlert = async (tx: DbOrTx): Promise<void> => {
     // Serializa o alerta por organização: dois lançamentos simultâneos não gravam dois alertas.

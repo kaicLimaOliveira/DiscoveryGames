@@ -128,6 +128,18 @@ describe('budget', () => {
     expect(await p.auditLog.count({ where: { action: 'budget.alert' } })).toBe(1)
   })
 
+  it('recordCost repetido dentro da mesma transação não aborta a transação', async () => {
+    const p = db!.prisma
+    const e = entry(1)
+    await p.$transaction(async (tx) => {
+      await recordCost(tx, e)
+      await recordCost(tx, e)
+      await tx.organization.update({ where: { id: orgId }, data: { name: 'depois' } })
+    })
+    expect(await p.costLedger.count()).toBe(1)
+    expect((await p.organization.findUniqueOrThrow({ where: { id: orgId } })).name).toBe('depois')
+  })
+
   it('budgetStatus informa alerta e bloqueio e exige acesso', async () => {
     const p = db!.prisma
     const svc = createBudgetService({ db: p })

@@ -493,6 +493,31 @@ describe('source-service: leitura, direitos e retry', () => {
     await expect(svc.retry(viewerA, orgA, id)).rejects.toBeInstanceOf(ForbiddenError)
   })
 
+  it('retry com job anterior ainda na fila lança ConflictError e não muda o status', async () => {
+    const p = db!.prisma
+    const { created, parts } = await uploadParts([PART])
+    const id = created.source.id
+    await svc.completeUpload(editorA, orgA, id, parts)
+    expect(await jobs('source.analyze', id)).toBe(1)
+    await p.source.update({ where: { id }, data: { status: 'failed', attempts: 2 } })
+    await expect(svc.retry(editorA, orgA, id)).rejects.toThrow(
+      new ConflictError('Já existe um processamento em andamento para esta fonte.'),
+    )
+    const row = await p.source.findUniqueOrThrow({ where: { id } })
+    expect(row).toMatchObject({ status: 'failed', attempts: 2 })
+    expect(await p.auditLog.count({ where: { action: 'source.retry' } })).toBe(0)
+    expect(await jobs('source.analyze', id)).toBe(1)
+  })
+
+  it('completeUpload com job já existente para a fonte desfaz a ida para queued', async () => {
+    const p = db!.prisma
+    const { created, parts } = await uploadParts([PART])
+    const id = created.source.id
+    await queue!.send('source.analyze', { sourceId: id }, { singletonKey: id })
+    await expect(svc.completeUpload(editorA, orgA, id, parts)).rejects.toBeInstanceOf(ConflictError)
+    expect((await p.source.findUniqueOrThrow({ where: { id } })).status).toBe('awaiting_upload')
+  })
+
   it('retry de link sem asset reenvia o download; de blocked_budget também', async () => {
     const p = db!.prisma
     const view = await svc.createFromLink(

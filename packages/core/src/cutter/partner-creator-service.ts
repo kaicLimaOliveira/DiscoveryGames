@@ -123,7 +123,8 @@ export function createPartnerCreatorService(deps: {
 
   return {
     async list(actor, orgId) {
-      await requireOrgAccess(db, actor, orgId, 'settings.manage')
+      // Leitura liberada: quem declara `authorized` escolhe o parceiro na lista.
+      await requireOrgAccess(db, actor, orgId, 'library.read')
       return db.partnerCreator.findMany({
         where: { organizationId: orgId },
         orderBy: [{ name: 'asc' }, { id: 'asc' }],

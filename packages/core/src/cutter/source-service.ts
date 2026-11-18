@@ -220,6 +220,17 @@ export function createSourceService(deps: {
   const { db, storage, queue, logger } = deps
   const partBytes = deps.partBytes ?? MULTIPART_PART_BYTES
 
+  /**
+   * Envia o job na transação. Na fila `exclusive`, `null` significa que já há job desta fonte:
+   * lança para desfazer a mudança de status (nunca fica em queued sem job).
+   */
+  async function sendOrConflict(...args: Parameters<JobQueue['send']>): Promise<void> {
+    const id = await queue.send(...args)
+    if (id === null) {
+      throw new ConflictError('Já existe um processamento em andamento para esta fonte.')
+    }
+  }
+
   function partCountFor(sizeBytes: number): number {
     return Math.max(1, Math.ceil(sizeBytes / partBytes))
   }
@@ -532,7 +543,7 @@ export function createSourceService(deps: {
         })
         if (moved.count === 0) return
         // Mesma transação: sem fonte em queued sem job, nem job sem fonte em queued.
-        await queue.send(
+        await sendOrConflict(
           QUEUES.sourceAnalyze,
           { sourceId },
           { db: sqlExecutorFor(tx), singletonKey: sourceId },
@@ -615,7 +626,7 @@ export function createSourceService(deps: {
           organizationId: orgId,
           diff: { kind: 'youtube_link', title, url, rights },
         })
-        await queue.send(
+        await sendOrConflict(
           QUEUES.sourceDownload,
           { sourceId: row.id },
           { db: sqlExecutorFor(tx), singletonKey: row.id },
@@ -697,7 +708,7 @@ export function createSourceService(deps: {
             'Só é possível tentar de novo uma fonte com falha ou bloqueada pelo orçamento.',
           )
         }
-        await queue.send(
+        await sendOrConflict(
           download ? QUEUES.sourceDownload : QUEUES.sourceAnalyze,
           { sourceId },
           { db: sqlExecutorFor(tx), singletonKey: sourceId },

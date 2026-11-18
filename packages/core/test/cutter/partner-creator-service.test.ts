@@ -93,8 +93,13 @@ describe('partner-creator-service', () => {
     ])
   })
 
-  it('editor recebe ForbiddenError', async () => {
-    await expect(svc.list(editorA, orgA)).rejects.toBeInstanceOf(ForbiddenError)
+  it('editor lista os parceiros, mas recebe ForbiddenError ao alterar', async () => {
+    const created = await svc.create(adminA, orgA, { name: 'X', channels: [] })
+    expect((await svc.list(editorA, orgA)).map((p) => p.id)).toEqual([created.id])
+    await expect(svc.update(editorA, orgA, created.id, { name: 'Y' })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    )
+    await expect(svc.remove(editorA, orgA, created.id)).rejects.toBeInstanceOf(ForbiddenError)
     await expect(svc.create(editorA, orgA, { name: 'X', channels: [] })).rejects.toBeInstanceOf(
       ForbiddenError,
     )
