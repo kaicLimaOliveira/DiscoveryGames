@@ -21,6 +21,30 @@ const SECRET_NAMES = [
 
 const MAX_DEPTH = 4
 
+// Comparação sem caixa e sem `_`/`-` (accessToken, access_token, ACCESS-TOKEN...). Os paths do
+// pino não aceitam isso, então a redação por chave roda também no scrub recursivo.
+const normalizeKey = (key: string): string => key.toLowerCase().replace(/[-_]/g, '')
+const SENSITIVE_KEYS = new Set(
+  [
+    'password',
+    'token',
+    'accessToken',
+    'refreshToken',
+    'idToken',
+    'secret',
+    'clientSecret',
+    'appSecret',
+    'authorization',
+    'cookie',
+    'setCookie',
+    'apiKey',
+    'codeVerifier',
+    'credential',
+    'credentialEnc',
+    'totpSecret',
+  ].map(normalizeKey),
+)
+
 // `code` (OAuth) só é segredo em objetos com formato de requisição; um `*.code` genérico
 // apagaria códigos de erro (ECONNREFUSED, P2002) de `err.code`.
 const REQUEST_PARENTS = ['query', 'body', 'params'] as const
@@ -52,7 +76,9 @@ function scrub(value: unknown, depth: number): unknown {
   if (depth > 0 && Array.isArray(value)) return value.map((v) => scrub(v, depth - 1))
   if (depth > 0 && isPlainObject(value)) {
     const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value)) out[k] = scrub(v, depth - 1)
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = SENSITIVE_KEYS.has(normalizeKey(k)) ? CENSOR : scrub(v, depth - 1)
+    }
     return out
   }
   // pino's redact traversal breaks on some exotic instances (e.g. URL); their
@@ -92,8 +118,8 @@ export function createLogger(opts: {
       },
     },
     formatters: {
-      // strings at first and second level of the log object
-      log: (obj) => scrub(obj, 2) as Record<string, unknown>,
+      // strings and sensitive keys down to MAX_DEPTH levels of the log object
+      log: (obj) => scrub(obj, MAX_DEPTH) as Record<string, unknown>,
     },
   }
   return opts.destination ? pino(options, opts.destination) : pino(options)

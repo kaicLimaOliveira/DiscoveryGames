@@ -111,4 +111,29 @@ describe('logger', () => {
     expect(out).not.toContain('abc123')
     expect(out).not.toContain('def456')
   })
+
+  it('redige chaves sensíveis em qualquer caixa e formato', () => {
+    const { lines, log } = capture()
+    log.info(
+      {
+        accessToken: 'a',
+        refresh_token: 'b',
+        Authorization: 'Bearer c',
+        'set-cookie': 'd',
+        nested: { ACCESS_TOKEN: 'e', credentialEnc: 'f' },
+        err: { code: 'ECONNREFUSED' },
+      },
+      'x',
+    )
+    const out = lines.join('')
+    for (const v of ['"a"', '"b"', 'Bearer c', '"d"', '"e"', '"f"']) expect(out).not.toContain(v)
+    const j = JSON.parse(lines[0]!)
+    expect(j.accessToken).toBe('[REDACTED]')
+    expect(j.refresh_token).toBe('[REDACTED]')
+    expect(j.Authorization).toBe('[REDACTED]')
+    expect(j['set-cookie']).toBe('[REDACTED]')
+    expect(j.nested.ACCESS_TOKEN).toBe('[REDACTED]')
+    expect(j.nested.credentialEnc).toBe('[REDACTED]')
+    expect(j.err.code).toBe('ECONNREFUSED')
+  })
 })
