@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest'
-import { LlmError, createAnthropicProvider, type AnthropicLike } from '../src/index.js'
+import {
+  LlmError,
+  buildAnthropicClient,
+  createAnthropicProvider,
+  type AnthropicLike,
+} from '../src/index.js'
 
 const KEY = 'sk-ant-segredo-123'
 const req = {
@@ -110,15 +115,34 @@ describe('createAnthropicProvider', () => {
     expect(r.usage.inputTokens).toBe(10)
   })
 
-  it('max_tokens e JSON inválido viram LlmError não repetível', async () => {
-    const trunc = clientWith(async () => message({ stop_reason: 'max_tokens' }))
-    await expect(
-      createAnthropicProvider({ apiKey: KEY, client: trunc.client }).generateStructured(req),
-    ).rejects.toMatchObject({ name: 'LlmError', retryable: false })
-    const bad = clientWith(async () => message({ content: [{ type: 'text', text: 'não é json' }] }))
-    await expect(
-      createAnthropicProvider({ apiKey: KEY, client: bad.client }).generateStructured(req),
-    ).rejects.toMatchObject({ name: 'LlmError', retryable: false })
+  it('max_tokens, parada inesperada, sem texto e JSON inválido viram status invalid com usage', async () => {
+    const casos = [
+      message({ stop_reason: 'max_tokens' }),
+      message({ stop_reason: 'model_context_window_exceeded' }),
+      message({ stop_reason: 'pause_turn' }),
+      message({ content: [] }),
+      message({ content: [{ type: 'text', text: 'não é json' }] }),
+    ]
+    for (const m of casos) {
+      const { client } = clientWith(async () => m)
+      const r = await createAnthropicProvider({ apiKey: KEY, client }).generateStructured(req)
+      expect(r.status).toBe('invalid')
+      expect(r.json).toBeUndefined()
+      expect(r.error).toEqual(expect.any(String))
+      expect(r.usage).toEqual({
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheReadTokens: 300,
+        cacheWriteTokens: 400,
+      })
+      expect(r.model).toBe('claude-opus-5-5')
+    }
+  })
+
+  it('o cliente real é criado com maxRetries 2 e timeout de 5 min', () => {
+    const c = buildAnthropicClient(KEY)
+    expect(c.maxRetries).toBe(2)
+    expect(c.timeout).toBe(300_000)
   })
 
   it('erro 529/overloaded vira LlmError retryable; 400 vira não retryable', async () => {
@@ -131,6 +155,8 @@ describe('createAnthropicProvider', () => {
       retryable: true,
     })
     await expect(run(httpError(429))).rejects.toMatchObject({ retryable: true })
+    await expect(run(httpError(408))).rejects.toMatchObject({ retryable: true })
+    await expect(run(httpError(409))).rejects.toMatchObject({ retryable: true })
     await expect(run(httpError(503))).rejects.toMatchObject({ retryable: true })
     await expect(run(new Error('ECONNRESET'))).rejects.toMatchObject({ retryable: true })
     await expect(run(httpError(400))).rejects.toMatchObject({ retryable: false })

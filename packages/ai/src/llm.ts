@@ -16,9 +16,12 @@ export interface StructuredRequest {
 }
 
 export interface StructuredResult {
-  status: 'ok' | 'refused'
-  /** `null` quando `status === 'refused'`. */
+  /** `invalid`: resposta cobrada mas inutilizável (truncada, parada inesperada, sem texto ou JSON ilegível). */
+  status: 'ok' | 'refused' | 'invalid'
+  /** `null` se `refused`; `undefined` se `invalid`. */
   json: unknown
+  /** Motivo curto em pt-BR quando `status === 'invalid'` (nunca texto do SDK). */
+  error?: string
   usage: LlmUsage
   latencyMs: number
   model: string
@@ -58,7 +61,13 @@ function wrapError(err: unknown, apiKey: string): LlmError {
   const type = typeof rawType === 'string' && /^[a-z_]{1,40}$/.test(rawType) ? rawType : undefined
   const overloaded = status === 529 || type === 'overloaded_error'
   // Sem status = falha de rede/timeout/conexão: vale repetir.
-  const retryable = overloaded || status === undefined || status === 429 || status >= 500
+  const retryable =
+    overloaded ||
+    status === undefined ||
+    status === 408 ||
+    status === 409 ||
+    status === 429 ||
+    status >= 500
   const detalhe = [status !== undefined ? `HTTP ${status}` : 'sem resposta (rede)', type]
     .filter(Boolean)
     .join(', ')
@@ -66,12 +75,19 @@ function wrapError(err: unknown, apiKey: string): LlmError {
   return new LlmError(apiKey ? msg.split(apiKey).join('[redigido]') : msg, retryable, status)
 }
 
+/**
+ * O SDK cuida do backoff de falhas transitórias (2 tentativas); o laço de tentativas
+ * do chamador é limitado por cima disso. Timeout de 5 min por requisição.
+ */
+export function buildAnthropicClient(apiKey: string): Anthropic {
+  return new Anthropic({ apiKey, maxRetries: 2, timeout: 300_000 })
+}
+
 export function createAnthropicProvider(opts: {
   apiKey: string
   client?: AnthropicLike
 }): LlmProvider {
-  const client: AnthropicLike =
-    opts.client ?? (new Anthropic({ apiKey: opts.apiKey }) as unknown as AnthropicLike)
+  const client: AnthropicLike = opts.client ?? buildAnthropicClient(opts.apiKey)
 
   return {
     provider: 'anthropic',
@@ -123,15 +139,27 @@ export function createAnthropicProvider(opts: {
       if (res.stop_reason === 'refusal') {
         return { status: 'refused', json: null, usage, latencyMs, model: res.model }
       }
+      const invalid = (error: string): StructuredResult => ({
+        status: 'invalid',
+        json: undefined,
+        error,
+        usage,
+        latencyMs,
+        model: res.model,
+      })
       if (res.stop_reason === 'max_tokens') {
-        throw new LlmError('Resposta do Claude truncada (limite de tokens).', false)
+        return invalid('Resposta do Claude truncada (limite de tokens).')
       }
-      const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('')
+      if (res.stop_reason !== 'end_turn') {
+        return invalid(`Parada inesperada do Claude (${String(res.stop_reason)}).`)
+      }
+      const texts = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : []))
+      if (texts.length === 0) return invalid('Resposta do Claude sem texto.')
       let json: unknown
       try {
-        json = JSON.parse(text)
+        json = JSON.parse(texts.join(''))
       } catch {
-        throw new LlmError('Resposta do Claude não é JSON válido.', false)
+        return invalid('Resposta do Claude não é JSON válido.')
       }
       return { status: 'ok', json, usage, latencyMs, model: res.model }
     },
