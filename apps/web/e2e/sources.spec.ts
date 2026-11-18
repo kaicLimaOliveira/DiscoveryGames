@@ -192,3 +192,61 @@ test('candidatos semeados no banco: aceitar, rejeitar e ajustar para 0:10.0–0:
   })
   expect([saved.startMs, saved.endMs]).toEqual([10_000, 40_000])
 })
+
+test('player com erro (URL expirada) pede uma URL nova uma vez só', async ({ page }) => {
+  const orgId = await seedOrg('Player')
+  // O objeto não existe no storage: o <video> falha como falharia com a URL vencida.
+  const asset = await prisma.mediaAsset.create({
+    data: {
+      organizationId: orgId,
+      kind: 'original',
+      storageKey: `orgs/${orgId}/sources/player/original.mp4`,
+      sha256: 'b'.repeat(64),
+      sizeBytes: 1000n,
+      mimeType: 'video/mp4',
+      probe: {},
+      durationMs: 60_000,
+      hasAudio: true,
+    },
+  })
+  const source = await prisma.source.create({
+    data: {
+      organizationId: orgId,
+      kind: 'upload',
+      title: 'Fonte do player',
+      status: 'ready',
+      rightsBasis: 'own',
+      params: { targetMin: 5, targetMax: 10, minSec: 30, maxSec: 90, language: 'pt-BR' },
+      mediaAssetId: asset.id,
+    },
+  })
+  await prisma.clipCandidate.create({
+    data: {
+      organizationId: orgId,
+      sourceId: source.id,
+      rank: 1,
+      startMs: 5_000,
+      endMs: 45_000,
+      suggestedStartMs: 5_000,
+      suggestedEndMs: 45_000,
+      hookScore: 80,
+      reason: 'Motivo',
+      title: 'Corte do player',
+      captions: {},
+      hashtags: [],
+      layout: 'center',
+    },
+  })
+
+  const playerCalls: string[] = []
+  page.on('request', (r) => {
+    if (new URL(r.url()).pathname.endsWith('/player')) playerCalls.push(r.url())
+  })
+  await page.goto(`/orgs/${orgId}/sources/${source.id}`)
+  await hydrated(page)
+
+  await expect.poll(() => playerCalls.length, { timeout: 15_000 }).toBe(2)
+  // A segunda URL também falha: não pede de novo em seguida.
+  await page.waitForTimeout(3_000)
+  expect(playerCalls).toHaveLength(2)
+})

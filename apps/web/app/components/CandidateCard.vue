@@ -5,7 +5,8 @@ const props = defineProps<{
   playerUrl: string | null
   canEdit: boolean
 }>()
-const emit = defineEmits<{ updated: [candidate: CandidateView] }>()
+// `player-error`: o <video> falhou (a URL pré-assinada vale 1 h); a página pede outra.
+const emit = defineEmits<{ updated: [candidate: CandidateView]; 'player-error': [] }>()
 
 const STATUS_LABELS: Record<CandidateView['status'], string> = {
   suggested: 'Sugerido',
@@ -142,6 +143,7 @@ function useCurrentPosition(target: 'start' | 'end') {
       class="max-h-72 w-full rounded-md bg-black"
       @loadedmetadata="seekToStart"
       @timeupdate="onTimeUpdate"
+      @error="emit('player-error')"
     />
     <p class="text-sm">{{ candidate.reason }}</p>
 

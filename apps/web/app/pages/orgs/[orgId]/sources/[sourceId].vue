@@ -40,6 +40,17 @@ async function loadPlayer() {
   }
 }
 
+// A URL expira em 1 h: no erro do <video>, pede uma nova (no máximo uma vez por minuto, para
+// não repetir sem fim se o erro for do próprio arquivo). A troca do src recarrega o player.
+const PLAYER_RETRY_MS = 60_000
+let lastPlayerRetry = 0
+async function onPlayerError() {
+  if (Date.now() - lastPlayerRetry < PLAYER_RETRY_MS) return
+  lastPlayerRetry = Date.now()
+  playerUrl.value = null
+  await loadPlayer()
+}
+
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   void loadPlayer()
@@ -194,6 +205,7 @@ useHead({ title: computed(() => source.value?.title ?? 'Corte') })
         :player-url="playerUrl"
         :can-edit="canEdit"
         @updated="onUpdated"
+        @player-error="onPlayerError"
       />
     </section>
 
