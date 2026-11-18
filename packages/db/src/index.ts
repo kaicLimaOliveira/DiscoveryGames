@@ -6,6 +6,14 @@ export {
   OrganizationRole,
   SocialPlatform,
   AccountStatus,
+  RightsBasis,
+  SourceKind,
+  SourceStatus,
+  CandidateStatus,
+  ReframeLayout,
+  MediaAssetKind,
+  AiRunStatus,
+  CostCategory,
 } from './generated/prisma/enums.js'
 export type {
   User,
@@ -15,6 +23,14 @@ export type {
   SocialAccount,
   AuditLog,
   Heartbeat,
+  PartnerCreator,
+  Source,
+  RightsDeclaration,
+  MediaAsset,
+  Transcript,
+  AiRun,
+  CostLedger,
+  ClipCandidate,
 } from './generated/prisma/client.js'
 export { createPgBossQueue, sqlExecutorFor } from './queue/pgboss-queue.js'
 export type { PgBossQueue } from './queue/pgboss-queue.js'

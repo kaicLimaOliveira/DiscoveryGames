@@ -75,6 +75,12 @@ model Organization {
   settings           Setting[]
   auditLogs          AuditLog[]
   socialAccounts     SocialAccount[]
+  sources            Source[]
+  partnerCreators    PartnerCreator[]
+  mediaAssets        MediaAsset[]
+  aiRuns             AiRun[]
+  costLedger         CostLedger[]
+  clipCandidates     ClipCandidate[]
 }
 
 model OrganizationMember {
@@ -155,4 +161,242 @@ model OAuthState {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([expiresAt])
+}
+
+enum RightsBasis {
+  own
+  authorized
+  cc_license
+  clipper_program
+  none
+}
+
+enum SourceKind {
+  upload
+  youtube_link
+}
+
+enum SourceStatus {
+  awaiting_upload
+  queued
+  downloading
+  probing
+  transcribing
+  analyzing
+  ready
+  failed
+  blocked_budget
+}
+
+enum CandidateStatus {
+  suggested
+  accepted
+  rejected
+  rendered
+}
+
+enum ReframeLayout {
+  face
+  center
+  game_facecam
+  blur_fit
+}
+
+// A Fase 4 acrescenta `rendition`.
+enum MediaAssetKind {
+  original
+}
+
+enum AiRunStatus {
+  ok
+  invalid_output
+  refused
+  error
+}
+
+enum CostCategory {
+  llm
+  transcription
+}
+
+model PartnerCreator {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  organizationId   String       @db.Uuid
+  name             String
+  channels         String[]
+  authorizationUrl String?
+  // Chave do documento de autorização no storage.
+  authorizationKey String?
+  notes            String       @default("")
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sources          Source[]
+
+  @@index([organizationId])
+}
+
+model Source {
+  id                 String              @id @default(uuid(7)) @db.Uuid
+  organizationId     String              @db.Uuid
+  kind               SourceKind
+  title              String
+  originalUrl        String?
+  status             SourceStatus        @default(awaiting_upload)
+  // Mensagem em pt-BR para a UI.
+  statusDetail       String?
+  attempts           Int                 @default(0)
+  // Cópia da declaração vigente (o histórico fica em RightsDeclaration).
+  rightsBasis        RightsBasis
+  partnerCreatorId   String?             @db.Uuid
+  // {targetMin,targetMax,minSec,maxSec,language}
+  params             Json
+  uploadKey          String?
+  uploadId           String?
+  uploadSizeBytes    BigInt?
+  mediaAssetId       String?             @unique @db.Uuid
+  signals            Json?
+  createdById        String?             @db.Uuid
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  partnerCreator     PartnerCreator?     @relation(fields: [partnerCreatorId], references: [id], onDelete: SetNull)
+  mediaAsset         MediaAsset?         @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  rightsDeclarations RightsDeclaration[]
+  transcript         Transcript?
+  candidates         ClipCandidate[]
+  aiRuns             AiRun[]
+
+  @@index([organizationId, createdAt])
+}
+
+// Imutável: mudar a declaração cria uma nova linha.
+model RightsDeclaration {
+  id               String      @id @default(uuid(7)) @db.Uuid
+  sourceId         String      @db.Uuid
+  basis            RightsBasis
+  creatorName      String?
+  evidenceUrl      String?
+  evidenceKey      String?
+  licenseType      String?
+  sourceUrl        String?
+  programUrl       String?
+  partnerCreatorId String?     @db.Uuid
+  declaredById     String?     @db.Uuid
+  declaredAt       DateTime    @default(now()) @db.Timestamptz(3)
+  source           Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, declaredAt])
+}
+
+model MediaAsset {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @db.Uuid
+  kind           MediaAssetKind
+  storageKey     String         @unique
+  sha256         String
+  sizeBytes      BigInt
+  mimeType       String
+  probe          Json
+  durationMs     Int
+  width          Int?
+  height         Int?
+  hasAudio       Boolean
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source         Source?
+
+  @@index([organizationId, sha256])
+}
+
+model Transcript {
+  sourceId    String   @id @db.Uuid
+  language    String
+  text        String
+  // [{w,s,e}] com s/e em ms.
+  words       Json
+  provider    String
+  model       String
+  durationSec Int
+  costUsd     Decimal  @db.Decimal(12, 6)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  source      Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+}
+
+model AiRun {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  organizationId   String          @db.Uuid
+  sourceId         String?         @db.Uuid
+  task             String
+  provider         String
+  model            String
+  promptId         String
+  promptVersion    Int
+  inputHash        String
+  output           Json?
+  status           AiRunStatus
+  error            String?
+  inputTokens      Int             @default(0)
+  outputTokens     Int             @default(0)
+  cacheReadTokens  Int             @default(0)
+  cacheWriteTokens Int             @default(0)
+  costUsd          Decimal         @default(0) @db.Decimal(12, 6)
+  latencyMs        Int
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @db.Timestamptz(3)
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source           Source?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  candidates       ClipCandidate[]
+
+  @@index([task, inputHash, promptVersion, model])
+}
+
+model CostLedger {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  organizationId String       @db.Uuid
+  category       CostCategory
+  provider       String
+  units          Decimal      @db.Decimal(14, 4)
+  unitType       String
+  costUsd        Decimal      @db.Decimal(12, 6)
+  refType        String
+  refId          String
+  occurredAt     DateTime     @default(now()) @db.Timestamptz(3)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Impede lançamento duplicado em retry.
+  @@unique([refType, refId, unitType])
+  @@index([organizationId, occurredAt])
+}
+
+// As CHECKs (hookScore 0..100, endMs > startMs) são criadas por SQL manual na migração.
+model ClipCandidate {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  organizationId   String          @db.Uuid
+  sourceId         String          @db.Uuid
+  aiRunId          String?         @db.Uuid
+  rank             Int
+  startMs          Int
+  endMs            Int
+  suggestedStartMs Int
+  suggestedEndMs   Int
+  hookScore        Int
+  reason           String
+  title            String
+  captions         Json
+  hashtags         String[]
+  layout           ReframeLayout
+  status           CandidateStatus @default(suggested)
+  decidedById      String?         @db.Uuid
+  decidedAt        DateTime?       @db.Timestamptz(3)
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @db.Timestamptz(3)
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source           Source          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  aiRun            AiRun?          @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+
+  @@index([sourceId, rank])
 }
