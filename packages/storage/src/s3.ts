@@ -133,7 +133,7 @@ export function createStorage(cfg: StorageConfig): Storage {
       const disposition = opts.inline
         ? 'inline'
         : opts.filename
-          ? `attachment; filename="${opts.filename.replace(/["\\r\n]/g, '_')}"`
+          ? `attachment; filename="${opts.filename.replace(/["\\\r\n]/g, '_')}"`
           : undefined
       return getSignedUrl(
         client,

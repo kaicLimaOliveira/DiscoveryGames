@@ -102,6 +102,15 @@ it('presignGet com filename força download', async () => {
   expect(res.headers.get('content-disposition')).toContain('attachment; filename="clip.txt"')
 })
 
+it('presignGet preserva letras e troca aspas no filename', async () => {
+  const s = createStorage(cfg)
+  await putPart(await s.presignPut('get/c.txt', 'text/plain'), new Uint8Array([1]))
+  const res = await fetch(await s.presignGet('get/c.txt', { filename: 'report "final".mp4' }))
+  expect(res.headers.get('content-disposition')).toContain(
+    'attachment; filename="report _final_.mp4"',
+  )
+})
+
 it('head devolve null para chave inexistente', async () => {
   await expect(createStorage(cfg).head('nao/existe')).resolves.toBeNull()
 })
