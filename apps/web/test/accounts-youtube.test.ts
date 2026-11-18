@@ -21,6 +21,7 @@ const codeToChannel: Record<string, string> = {
   code_conflict: channels.conflict,
   code_perm: channels.perm,
   code_scope: channels.scope,
+  code_scope_linked: channels.ok,
 }
 
 const google: Server = createServer((req, res) => {
@@ -37,7 +38,7 @@ const google: Server = createServer((req, res) => {
       const code = form.get('code') ?? ''
       if (code === 'code_norefresh') return send(200, { access_token: SECRETS.access, scope: 'x' })
       if (!codeToChannel[code]) return send(400, { error: 'invalid_grant' })
-      if (code === 'code_scope') {
+      if (code === 'code_scope' || code === 'code_scope_linked') {
         return send(200, {
           access_token: `${SECRETS.access}:${codeToChannel[code]}`,
           refresh_token: SECRETS.refresh,
@@ -131,9 +132,18 @@ describe('conexão YouTube', () => {
     expect(row?.provider).toBe('youtube')
   })
 
-  it('start: viewer 403, outra organização 404, sem sessão 401', async () => {
-    expect((await start(clients.viewerA, orgA)).status).toBe(403)
-    expect((await start(clients.adminB, orgA)).status).toBe(404)
+  it('start: viewer e outra organização redirecionam com erro, sem sessão 401', async () => {
+    // Navegação de página inteira: 403 e 404 viram redirect com mensagem fixa.
+    const denied = await start(clients.viewerA, orgA)
+    expect(denied.status).toBe(302)
+    expect(location(denied).startsWith(`/orgs/${orgA}/accounts?error=`)).toBe(true)
+    expect(errorOf(location(denied))).toBe(
+      'Você não tem permissão para conectar contas nesta organização.',
+    )
+    const hidden = await start(clients.adminB, orgA)
+    expect(hidden.status).toBe(302)
+    expect(location(hidden).startsWith('/orgs?error=')).toBe(true)
+    expect(errorOf(location(hidden))).toBe('Organização não encontrada.')
     expect((await start(new Client(), orgA)).status).toBe(401)
   })
 
@@ -259,21 +269,38 @@ describe('conexão YouTube', () => {
     expect(JSON.stringify(anon.body)).not.toContain('VALOR_SECRETO')
   })
 
-  it('conflito e escopo faltando revogam a concessão e não gravam', async () => {
+  it('conflito não revoga: a concessão do Google pode sustentar outro canal vinculado', async () => {
     const before = revoked.length
     const state = await begin(clients.adminA, orgA)
     // channels.conflict já está vinculado em outra organização (teste anterior).
-    await callback(clients.adminA, { code: 'code_conflict', state })
+    const res = await callback(clients.adminA, { code: 'code_conflict', state })
+    expect(errorOf(location(res))).toBe('Esta conta já está vinculada a outra organização.')
+    expect(revoked.length).toBe(before)
+  })
+
+  it('escopo faltando revoga só se o canal ainda não está vinculado', async () => {
+    const msg =
+      'Autorize todas as permissões pedidas (envio e leitura do YouTube) para conectar o canal.'
+    const before = revoked.length
+    const s1 = await begin(clients.adminA, orgA)
+    const res = await callback(clients.adminA, { code: 'code_scope', state: s1 })
+    expect(errorOf(location(res))).toBe(msg)
     expect(revoked.length).toBe(before + 1)
     expect(revoked.at(-1)).toBe(SECRETS.refresh)
-
-    const s2 = await begin(clients.adminA, orgA)
-    const res = await callback(clients.adminA, { code: 'code_scope', state: s2 })
-    expect(errorOf(location(res))).toBe(
-      'Autorize todas as permissões pedidas (envio e leitura do YouTube) para conectar o canal.',
-    )
-    expect(revoked.length).toBe(before + 2)
     expect(await db.socialAccount.count({ where: { externalId: channels.scope } })).toBe(0)
+
+    // Reconexão de um canal já vinculado (channels.ok) com escopo faltando: não revoga e
+    // a credencial existente continua igual.
+    const linked = await db.socialAccount.findFirstOrThrow({
+      where: { platform: 'youtube', externalId: channels.ok },
+    })
+    const s2 = await begin(clients.adminA, orgA)
+    const res2 = await callback(clients.adminA, { code: 'code_scope_linked', state: s2 })
+    expect(errorOf(location(res2))).toBe(msg)
+    expect(revoked.length).toBe(before + 1)
+    const after = await db.socialAccount.findUniqueOrThrow({ where: { id: linked.id } })
+    expect(after.credentialEnc).toBe(linked.credentialEnc)
+    expect(after.scopes).toEqual(linked.scopes)
   })
 
   it('callback re-confere accounts.manage: perdeu a permissão depois do start', async () => {

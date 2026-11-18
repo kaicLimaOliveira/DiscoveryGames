@@ -9,6 +9,11 @@ const form = reactive({ name: '', slug: '' })
 const error = ref('')
 const creating = ref(false)
 
+// Redirects do servidor (OAuth do Google, org inexistente) trazem ?error=<mensagem fixa>.
+const route = useRoute()
+const notice = ref(typeof route.query.error === 'string' ? route.query.error : '')
+if (route.query.error) await navigateTo({ path: route.path }, { replace: true })
+
 function openCreate() {
   Object.assign(form, { name: '', slug: '' })
   error.value = ''
@@ -40,6 +45,8 @@ async function create() {
       <h1 class="text-2xl font-semibold">Organizações</h1>
       <UButton v-if="me?.isAdmin" @click="openCreate">Nova organização</UButton>
     </div>
+
+    <UAlert v-if="notice" color="error" variant="subtle" :description="notice" />
 
     <p v-if="!orgs.length" class="text-muted">
       Você ainda não pertence a nenhuma organização.

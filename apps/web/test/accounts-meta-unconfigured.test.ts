@@ -37,4 +37,14 @@ describe('Meta não configurada', () => {
       )
     }
   })
+
+  it('youtube/start redireciona ao /accounts com mensagem fixa (503 não vira JSON cru)', async () => {
+    const res = await admin.request(`/api/orgs/${orgId}/accounts/youtube/start`)
+    expect(res.status).toBe(302)
+    const loc = res.headers.get('location') ?? ''
+    expect(loc.startsWith(`/orgs/${orgId}/accounts?error=`)).toBe(true)
+    expect(new URL(loc, 'http://x').searchParams.get('error')).toBe(
+      'Integração com o Google não configurada.',
+    )
+  })
 })

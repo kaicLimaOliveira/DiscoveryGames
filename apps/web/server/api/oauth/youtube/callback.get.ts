@@ -11,6 +11,7 @@ import { GOOGLE_SCOPES } from '@central/platforms'
 import type { H3Event } from 'h3'
 import { z } from 'zod'
 import { requireActor } from '../../../utils/auth'
+import { SESSION_EXPIRED_MESSAGE } from '../../../utils/oauth-messages'
 import { useServices } from '../../../utils/services'
 
 const Query = z.object({
@@ -25,7 +26,7 @@ const MSG = {
   forbidden: 'Você não tem permissão para esta ação.',
   notConfigured: 'Integração com o Google não configurada.',
   unavailable: 'O Google não respondeu. Tente de novo.',
-  session: 'Sua sessão expirou. Entre e conecte o YouTube de novo.',
+  session: SESSION_EXPIRED_MESSAGE,
   missingScopes:
     'Autorize todas as permissões pedidas (envio e leitura do YouTube) para conectar o canal.',
   generic: 'Não foi possível conectar o canal. Tente de novo.',
@@ -57,13 +58,16 @@ async function handle(event: H3Event) {
   if (!google) return redirectError(event, back, MSG.notConfigured)
 
   let refreshToken: string | undefined
+  let channelId: string | undefined
   try {
     const tokens = await google.exchange(code, codeVerifier)
     refreshToken = tokens.refreshToken
+    // O canal vem antes da checagem de escopos: saber se ele já está vinculado decide a revogação.
+    const channel = await google.myChannel(tokens.accessToken)
+    channelId = channel.channelId
     if (!GOOGLE_SCOPES.every((scope) => tokens.scopes.includes(scope))) {
       throw new PermanentError(MSG.missingScopes)
     }
-    const channel = await google.myChannel(tokens.accessToken)
     await accounts.upsertLinked(actor, orgId, {
       platform: 'youtube',
       externalId: channel.channelId,
@@ -72,8 +76,24 @@ async function handle(event: H3Event) {
       scopes: tokens.scopes,
     })
   } catch (err) {
-    // Não deixa uma concessão pendurada no Google (melhor esforço, erro descartado).
-    if (refreshToken) await google.revoke(refreshToken).catch(() => undefined)
+    // O Google revoga a concessão inteira do cliente: se esta identidade já autorizou um canal
+    // vinculado (nesta ou em outra organização), revogar mataria a credencial que funciona.
+    // Só revoga quando o canal é desconhecido ou ainda não está vinculado; nunca em conflito.
+    if (refreshToken && !(err instanceof ConflictError)) {
+      let linked = true // na dúvida (falha na consulta), não revoga
+      if (channelId === undefined) linked = false
+      else {
+        try {
+          linked =
+            (await db.socialAccount.count({
+              where: { platform: 'youtube', externalId: channelId },
+            })) > 0
+        } catch {
+          // mantém linked = true
+        }
+      }
+      if (!linked) await google.revoke(refreshToken).catch(() => undefined)
+    }
     if (err instanceof ForbiddenError) return redirectError(event, back, MSG.forbidden)
     if (
       err instanceof PermanentError ||

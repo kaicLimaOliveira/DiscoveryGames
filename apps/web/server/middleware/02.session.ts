@@ -8,6 +8,7 @@ import {
   type SessionActor,
   type SessionData,
 } from '../utils/auth'
+import { SESSION_EXPIRED_MESSAGE } from '../utils/oauth-messages'
 import { useServices } from '../utils/services'
 
 // Rotas de /api/** que não exigem sessão.
@@ -18,7 +19,6 @@ const AUTH_UTILS_SESSION = '/api/_auth/session'
 // Retorno do Google: sem sessão vira redirect para o login (a URL traz code/state, nunca
 // pode voltar em corpo de erro).
 const OAUTH_CALLBACK = '/api/oauth/youtube/callback'
-export const SESSION_EXPIRED_MESSAGE = 'Sua sessão expirou. Entre e conecte o YouTube de novo.'
 
 /** Sessão + ator válidos (usuário ativo e mesma sessionVersion), ou null. */
 async function validSession(
