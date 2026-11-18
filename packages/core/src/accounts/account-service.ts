@@ -1,9 +1,10 @@
 import type { AccountStatus, Db, DbOrTx, SocialPlatform } from '@central/db'
 import type { SecretCipher } from '@central/shared'
 import { writeAudit } from '../audit.js'
-import { can, type Action, type Actor } from '../authz/roles.js'
-import { isUniqueViolation } from '../auth/identity-service.js'
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../errors.js'
+import { requireOrgAccess } from '../authz/org-access.js'
+import type { Actor } from '../authz/roles.js'
+import { isUniqueViolation } from '../db-errors.js'
+import { ConflictError, NotFoundError, ValidationError } from '../errors.js'
 
 export interface AccountView {
   id: string
@@ -57,7 +58,6 @@ export interface AccountLogger {
 const HANDLE_RE = /^[a-z0-9._]{2,24}$/
 const MIN_LIMIT = 1
 const MAX_LIMIT = 1000
-const ORG_NOT_FOUND = 'Organização não encontrada.'
 const ACCOUNT_NOT_FOUND = 'Conta não encontrada.'
 const OTHER_ORG = 'Esta conta já está vinculada a outra organização.'
 
@@ -85,17 +85,6 @@ export function createAccountService(deps: {
 }): AccountService {
   const { db, cipher, logger } = deps
 
-  /** 404 para quem não enxerga a organização, 403 para quem enxerga sem permissão. */
-  async function requireOrg(client: DbOrTx, actor: Actor, orgId: string, action: Action) {
-    const visible =
-      actor.globalRole === 'admin' || actor.memberships.some((m) => m.organizationId === orgId)
-    const org = visible
-      ? await client.organization.findUnique({ where: { id: orgId }, select: { id: true } })
-      : null
-    if (!org) throw new NotFoundError(ORG_NOT_FOUND)
-    if (!can(actor, orgId, action)) throw new ForbiddenError()
-  }
-
   async function loadAccount(client: DbOrTx, orgId: string, accountId: string) {
     const row = await client.socialAccount.findFirst({
       where: { id: accountId, organizationId: orgId },
@@ -110,7 +99,7 @@ export function createAccountService(deps: {
     orgId: string,
     input: LinkedAccountInput,
   ): Promise<AccountView> {
-    await requireOrg(tx, actor, orgId, 'accounts.manage')
+    await requireOrgAccess(tx, actor, orgId, 'accounts.manage')
     const { platform, externalId, displayName, scopes } = input
     const credentialEnc = cipher.encrypt(
       JSON.stringify(input.credential),
@@ -169,9 +158,26 @@ export function createAccountService(deps: {
     }
   }
 
+  async function upsertLinked(
+    actor: Actor,
+    orgId: string,
+    input: LinkedAccountInput,
+    opts?: { tx?: DbOrTx },
+  ): Promise<AccountView> {
+    if (opts?.tx) return upsertIn(opts.tx, actor, orgId, input)
+    return db.$transaction((tx) => upsertIn(tx, actor, orgId, input))
+  }
+
+  async function readCredential(orgId: string, accountId: string): Promise<unknown> {
+    const row = await loadAccount(db, orgId, accountId)
+    if (row.credentialEnc === null) return null
+    const plain = cipher.decrypt(row.credentialEnc, aadFor(row.platform, row.externalId))
+    return JSON.parse(plain) as unknown
+  }
+
   return {
     async list(actor, orgId) {
-      await requireOrg(db, actor, orgId, 'library.read')
+      await requireOrgAccess(db, actor, orgId, 'library.read')
       return db.socialAccount.findMany({
         where: { organizationId: orgId },
         orderBy: { createdAt: 'asc' },
@@ -180,14 +186,14 @@ export function createAccountService(deps: {
     },
 
     async linkTiktok(actor, orgId, handle) {
-      await requireOrg(db, actor, orgId, 'accounts.manage')
+      await requireOrgAccess(db, actor, orgId, 'accounts.manage')
       const normalized = handle.replace(/\s+/g, '').replace(/^@+/, '').toLowerCase()
       if (!HANDLE_RE.test(normalized)) {
         throw new ValidationError(
           'Usuário do TikTok inválido: use de 2 a 24 letras, números, ponto ou sublinhado.',
         )
       }
-      return this.upsertLinked(actor, orgId, {
+      return upsertLinked(actor, orgId, {
         platform: 'tiktok',
         externalId: normalized,
         displayName: `@${normalized}`,
@@ -196,20 +202,12 @@ export function createAccountService(deps: {
       })
     },
 
-    async upsertLinked(actor, orgId, input, opts) {
-      if (opts?.tx) return upsertIn(opts.tx, actor, orgId, input)
-      return db.$transaction((tx) => upsertIn(tx, actor, orgId, input))
-    },
+    upsertLinked,
 
-    async readCredential(orgId, accountId) {
-      const row = await loadAccount(db, orgId, accountId)
-      if (row.credentialEnc === null) return null
-      const plain = cipher.decrypt(row.credentialEnc, aadFor(row.platform, row.externalId))
-      return JSON.parse(plain) as unknown
-    },
+    readCredential,
 
     async setDailyLimit(actor, orgId, accountId, limit) {
-      await requireOrg(db, actor, orgId, 'accounts.manage')
+      await requireOrgAccess(db, actor, orgId, 'accounts.manage')
       const before = await loadAccount(db, orgId, accountId)
       if (
         limit !== null &&
@@ -238,12 +236,12 @@ export function createAccountService(deps: {
     },
 
     async disconnect(actor, orgId, accountId, revoke) {
-      await requireOrg(db, actor, orgId, 'accounts.manage')
+      await requireOrgAccess(db, actor, orgId, 'accounts.manage')
       const row = await loadAccount(db, orgId, accountId)
       if (revoke) {
         // Melhor esforço: falha na revogação não impede a remoção.
         try {
-          await revoke(await this.readCredential(orgId, accountId))
+          await revoke(await readCredential(orgId, accountId))
         } catch (err) {
           logger?.warn(
             {

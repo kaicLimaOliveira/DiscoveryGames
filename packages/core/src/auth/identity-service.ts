@@ -12,6 +12,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../errors.js'
+import { isUniqueViolation } from '../db-errors.js'
 import { hashPassword, verifyPassword } from './password.js'
 import type { LoginRateLimiter } from './rate-limiter.js'
 import { generateTotpSecret, totpUri, verifyTotp } from './totp.js'
@@ -64,10 +65,6 @@ function assertPassword(password: string): void {
   if (password.length < MIN_PASSWORD) {
     throw new ValidationError(`A senha deve ter pelo menos ${MIN_PASSWORD} caracteres.`)
   }
-}
-
-export function isUniqueViolation(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
 }
 
 function maskEmail(email: string): string {

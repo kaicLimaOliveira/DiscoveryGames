@@ -3,7 +3,8 @@ import type { Db } from '@central/db'
 import { writeAudit } from '../audit.js'
 import { ConflictError } from '../errors.js'
 import { hashPassword } from './password.js'
-import { isUniqueViolation, normalizeEmail } from './identity-service.js'
+import { isUniqueViolation } from '../db-errors.js'
+import { normalizeEmail } from './identity-service.js'
 
 const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
 

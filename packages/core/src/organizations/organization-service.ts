@@ -1,7 +1,8 @@
 import type { Db } from '@central/db'
 import { writeAudit } from '../audit.js'
 import { can, type Actor } from '../authz/roles.js'
-import { isUniqueViolation } from '../auth/identity-service.js'
+import { requireOrgAccess } from '../authz/org-access.js'
+import { isUniqueViolation } from '../db-errors.js'
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../errors.js'
 
 export interface ClipDefaults {
@@ -223,11 +224,9 @@ export function createOrganizationService(deps: { db: Db; now?: () => Date }): O
 
   async function load(actor: Actor, id: string, action: 'library.read' | 'settings.manage') {
     // Não revela a existência: quem não pertence à organização recebe 404, nunca 403.
-    const visible =
-      actor.globalRole === 'admin' || actor.memberships.some((m) => m.organizationId === id)
-    const row = visible ? await db.organization.findUnique({ where: { id } }) : null
+    await requireOrgAccess(db, actor, id, action)
+    const row = await db.organization.findUnique({ where: { id } })
     if (!row) throw new NotFoundError(NOT_FOUND)
-    if (!can(actor, id, action)) throw new ForbiddenError()
     return row
   }
 

@@ -1,6 +1,7 @@
-import { can, NotFoundError, type Actor } from '@central/core'
+import { requireOrgAccess, type Actor } from '@central/core'
 import type { H3Event } from 'h3'
 import { requireActor } from './auth'
+import { toHttpError } from './errors'
 import { useServices } from './services'
 
 /**
@@ -9,14 +10,10 @@ import { useServices } from './services'
  */
 export async function requireAccountsManage(event: H3Event, orgId: string): Promise<Actor> {
   const actor = await requireActor(event)
-  const visible =
-    actor.globalRole === 'admin' || actor.memberships.some((m) => m.organizationId === orgId)
-  const org = visible
-    ? await useServices().db.organization.findUnique({ where: { id: orgId }, select: { id: true } })
-    : null
-  if (!org) throw new NotFoundError('Organização não encontrada.')
-  if (!can(actor, orgId, 'accounts.manage')) {
-    throw createError({ statusCode: 403, message: 'Você não tem permissão para esta ação.' })
+  try {
+    await requireOrgAccess(useServices().db, actor, orgId, 'accounts.manage')
+  } catch (err) {
+    throw toHttpError(event, err)
   }
   return actor
 }
