@@ -124,6 +124,8 @@ export function createSourceAnalyzeHandler(deps: SourceAnalyzeDeps) {
       return
     }
 
+    // `queued` = início de análise (nova ou retry do usuário); outro estado = retomada pelo pg-boss.
+    const startedFromQueued = source.status === 'queued'
     const setStatus = async (status: SourceStatus) => {
       await db.source.update({ where: { id: sourceId }, data: { status } })
       log.info({ stage: status }, 'etapa da análise')
@@ -200,13 +202,20 @@ export function createSourceAnalyzeHandler(deps: SourceAnalyzeDeps) {
       }
       const durationMs = asset.durationMs
 
-      // 2. Orçamento (R4): só antes de qualquer gasto desta fonte.
+      // 2. Orçamento (spec §5.3): toda análise que começa de `queued` (nova ou "Tentar de novo")
+      // é uma nova análise e passa pelo saldo; a retomada pelo pg-boss de uma etapa em andamento
+      // só passa se ainda não houve gasto nesta fonte (análise em andamento termina).
       const [existingTranscript, okRun] = await Promise.all([
         db.transcript.findUnique({ where: { sourceId } }),
         db.aiRun.findFirst({ where: { sourceId, task: TASK, status: 'ok' }, select: { id: true } }),
       ])
-      if (!existingTranscript && !okRun) {
-        const estimate = estimateAnalysisCostUsd(durationMs, frameTimes(durationMs).length)
+      if (startedFromQueued || (!existingTranscript && !okRun)) {
+        // A transcrição só entra se ainda não existe; a chamada do Claude entra sempre (o cache
+        // por inputHash só é conhecido depois dos quadros, que vêm depois desta checagem).
+        const full = estimateAnalysisCostUsd(durationMs, frameTimes(durationMs).length)
+        const estimate = existingTranscript
+          ? full - transcriptionCostUsd([durationMs / 1000])
+          : full
         const budget = await checkBudget(db, organizationId, estimate)
         if (!budget.allowed) throw new Stop(MSG.budget, 'blocked_budget')
       }
@@ -401,9 +410,12 @@ export function createSourceAnalyzeHandler(deps: SourceAnalyzeDeps) {
         aiRunId = runIds.at(-1)!
       }
 
-      // 6. Candidatos: troca os `suggested` desta fonte e marca `ready` na mesma transação.
+      // 6. Candidatos: troca os `suggested` desta fonte e marca `ready` na mesma transação. Os
+      // aceitos/rejeitados ficam; os novos sugeridos são numerados depois do maior rank restante.
       await db.$transaction(async (tx) => {
         await tx.clipCandidate.deleteMany({ where: { sourceId, status: 'suggested' } })
+        const kept = await tx.clipCandidate.aggregate({ where: { sourceId }, _max: { rank: true } })
+        const baseRank = kept._max.rank ?? 0
         await tx.clipCandidate.createMany({
           data: candidates.map((c, i) => {
             const startMs = Math.round(c.startSec * 1000)
@@ -412,7 +424,7 @@ export function createSourceAnalyzeHandler(deps: SourceAnalyzeDeps) {
               organizationId,
               sourceId,
               aiRunId,
-              rank: i + 1,
+              rank: baseRank + i + 1,
               startMs,
               endMs,
               suggestedStartMs: startMs,

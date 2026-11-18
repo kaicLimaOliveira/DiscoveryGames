@@ -433,3 +433,85 @@ it('fonte fora dos estados retomáveis é ignorada', async () => {
   expect((await db.source.findUniqueOrThrow({ where: { id: sourceId } })).status).toBe('ready')
   expect(llm.calls).toBe(0)
 })
+
+it('retry do usuário com transcrição pronta e orçamento esgotado: blocked_budget sem chamar a IA', async () => {
+  const { orgId, sourceId } = await seed({ file: speech })
+  // 1ª análise: a IA não acha trechos válidos (custo lançado, transcrição guardada).
+  const llm = fakeLlm(() => ({
+    status: 'ok',
+    json: { candidates: [candidate(10, 12)] },
+    usage: USAGE,
+    latencyMs: 10,
+    model: MODEL,
+  }))
+  const transcriber = fakeTranscriber()
+  const handler = handlerWith({ transcriber, llm })
+  await handler(job(sourceId))
+  expect((await db.source.findUniqueOrThrow({ where: { id: sourceId } })).status).toBe('failed')
+  expect(await db.transcript.count({ where: { sourceId } })).toBe(1)
+  const llmCalls = llm.calls
+
+  // Orçamento esgotado pelo gasto já lançado; o usuário clica "Tentar de novo" (retry → queued).
+  const spent = await db.costLedger.aggregate({
+    where: { organizationId: orgId },
+    _sum: { costUsd: true },
+  })
+  await db.organization.update({
+    where: { id: orgId },
+    data: { aiMonthlyBudgetUsd: spent._sum.costUsd!.toNumber() },
+  })
+  await db.source.update({
+    where: { id: sourceId },
+    data: { status: 'queued', statusDetail: null, attempts: 0 },
+  })
+  await handler(job(sourceId))
+
+  const source = await db.source.findUniqueOrThrow({ where: { id: sourceId } })
+  expect(source.status).toBe('blocked_budget')
+  expect(llm.calls).toBe(llmCalls)
+  expect(transcriber.calls).toBe(1)
+})
+
+it('retomada pelo pg-boss de uma análise em andamento não é bloqueada pelo orçamento', async () => {
+  const { orgId, sourceId } = await seed({ file: speech })
+  let execution = 1
+  const llm = fakeLlm(() =>
+    execution === 1
+      ? new LlmError('Falha na chamada ao Claude (HTTP 529).', true, 529)
+      : {
+          status: 'ok',
+          json: { candidates: [candidate(0.5, 2.5, 90)] },
+          usage: USAGE,
+          latencyMs: 10,
+          model: MODEL,
+        },
+  )
+  const handler = handlerWith({ llm })
+  await expect(handler(job(sourceId))).rejects.toBeInstanceOf(LlmError)
+  // Orçamento zerado no meio: a análise em andamento (status analyzing) termina.
+  await db.organization.update({ where: { id: orgId }, data: { aiMonthlyBudgetUsd: 0 } })
+  execution = 2
+  await handler(job(sourceId))
+  expect((await db.source.findUniqueOrThrow({ where: { id: sourceId } })).status).toBe('ready')
+})
+
+it('reanálise mantém aceitos e rejeitados e numera os novos sugeridos depois deles', async () => {
+  const { sourceId } = await seed({ file: speech })
+  const handler = handlerWith({})
+  await handler(job(sourceId))
+  const first = await db.clipCandidate.findMany({ where: { sourceId }, orderBy: { rank: 'asc' } })
+  expect(first.map((c) => c.rank)).toEqual([1, 2])
+  await db.clipCandidate.update({ where: { id: first[0]!.id }, data: { status: 'accepted' } })
+  await db.clipCandidate.update({ where: { id: first[1]!.id }, data: { status: 'rejected' } })
+
+  await db.source.update({ where: { id: sourceId }, data: { status: 'queued' } })
+  await handler(job(sourceId))
+
+  const all = await db.clipCandidate.findMany({ where: { sourceId }, orderBy: { rank: 'asc' } })
+  expect(all.map((c) => [c.rank, c.status])).toEqual([
+    [1, 'accepted'],
+    [2, 'rejected'],
+    [3, 'suggested'],
+    [4, 'suggested'],
+  ])
+})
