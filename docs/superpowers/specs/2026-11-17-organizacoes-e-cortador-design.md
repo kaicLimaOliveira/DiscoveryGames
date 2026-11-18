@@ -165,11 +165,11 @@ Os prazos são configuráveis por organização.
 - **Volume e cotas [dono: o volume varia conforme a configuração de cada organização e página]:**
   - Cada conta vinculada tem um **limite diário configurável** de publicações.
   - A central controla as cotas das plataformas:
-    - YouTube: cerca de 10.000 unidades por dia **por projeto do Google**, compartilhadas por todas as organizações, o que dá uns 6 uploads;
+    - YouTube: **100 uploads (`videos.insert`) por dia por projeto do Google**, num bucket próprio, mais 10.000 unidades por dia para os outros métodos. Os dois limites são compartilhados por todas as organizações (regra vigente desde 01/06/2026, conforme [youtube.md](../../07-integracoes/youtube.md) §10; corrigido em 2026-11-18, porque a versão anterior deste texto usava a regra antiga, de cerca de 6 uploads por dia);
     - Facebook: 30 Reels por Página a cada 24 h;
     - Instagram: o limite de publicação por conta.
   - Antes de publicar ou agendar, a central confere o saldo. O que não cabe na cota do dia fica na fila para o próximo período, com aviso, em vez de falhar. Isso usa a `QuotaUsage` já desenhada.
-  - **[call]:** o pedido de aumento de cota do YouTube (auditoria) entra como tarefa logo no início da fase de publicação.
+  - **[call]:** com 100 uploads por dia por projeto, o pedido de aumento de cota (auditoria) só é necessário se o volume somado das organizações se aproximar desse teto. O painel avisa quando o uso passar de 80% do limite diário.
 - **Duplicidade:** o mesmo corte (mesmo hash de vídeo) não pode ser publicado duas vezes na mesma conta. Republicar exige uma ação explícita, que fica registrada na auditoria.
 
 ## 6. Telas (primeira entrega)

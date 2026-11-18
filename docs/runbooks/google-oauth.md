@@ -50,7 +50,7 @@ Limite do Google: **100 refresh tokens por conta Google por client ID**, e um to
 
 A cota é **por projeto do Google**, não por canal ou organização, então todas as organizações da Central dividem a mesma ([youtube.md](../07-integracoes/youtube.md) §10):
 
-- padrão ✅: **10.000 unidades por dia** para os endpoints em geral, mais buckets separados de **100 chamadas `videos.insert` por dia** e 100 de `search.list` (regra vigente desde 01/06/2026 segundo [youtube.md](../07-integracoes/youtube.md); a [spec](../superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md) §5.5 ainda fala em cerca de 6 uploads/dia pela regra antiga, e a conferência está em aberto);
+- padrão ✅: **10.000 unidades por dia** para os endpoints em geral, mais buckets separados de **100 chamadas `videos.insert` por dia** e 100 de `search.list` (regra vigente desde 01/06/2026 segundo [youtube.md](../07-integracoes/youtube.md));
 - reset à meia-noite do horário do Pacífico;
 - existe ainda um limite diário de uploads **por canal**, independente da cota, e o número não é publicado (❓).
 
