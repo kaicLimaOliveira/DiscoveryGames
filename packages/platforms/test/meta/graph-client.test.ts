@@ -128,11 +128,32 @@ describe('createMetaGraphClient.discoverPages', () => {
     expect((err as Error).message).not.toContain(TOKEN)
   })
 
-  it('401 com OAuthException também é token inválido', async () => {
-    const { fetchFn } = fakeFetch([jsonResponse({ error: { type: 'OAuthException' } }, 401)])
+  it('401 com código 190 também é token inválido', async () => {
+    const { fetchFn } = fakeFetch([
+      jsonResponse({ error: { code: 190, type: 'OAuthException' } }, 401),
+    ])
     await expect(client(fetchFn).discoverPages(TOKEN)).rejects.toThrow(
       'Token da Meta inválido ou expirado.',
     )
+  })
+
+  it('OAuthException com outro código (ex.: Page token em /me/accounts) é recusa, não token inválido', async () => {
+    for (const [code, status] of [
+      [100, 400],
+      [10, 403],
+      [undefined, 401],
+    ] as const) {
+      const { fetchFn } = fakeFetch([
+        jsonResponse({ error: { code, type: 'OAuthException' } }, status),
+      ])
+      const err = await client(fetchFn)
+        .discoverPages(TOKEN)
+        .catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(PermanentError)
+      expect((err as Error).message).toBe(
+        'A Meta recusou a requisição. Confira as permissões do token.',
+      )
+    }
   })
 
   it('lista vazia vira PermanentError com dica do System User', async () => {

@@ -74,12 +74,8 @@ export function createMetaGraphClient(opts: MetaGraphClientOptions): MetaGraphCl
     const body = (await res.json().catch(() => ({}))) as RawResponse
     if (res.ok) return body
     if (res.status >= 500 || res.status === 429) throw new TransientError(META_UNAVAILABLE)
-    if (
-      (res.status === 400 || res.status === 401) &&
-      (body.error?.code === 190 || body.error?.type === 'OAuthException')
-    ) {
-      throw new PermanentError(META_INVALID_TOKEN)
-    }
+    // Só o código 190 é token inválido/expirado; outras OAuthException (permissão, app) são recusa.
+    if (body.error?.code === 190) throw new PermanentError(META_INVALID_TOKEN)
     throw new PermanentError(META_REJECTED)
   }
 

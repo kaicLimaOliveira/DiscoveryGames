@@ -252,7 +252,7 @@ async function connectMeta() {
 
     <div v-if="canManage" class="flex flex-wrap gap-2">
       <UButton color="neutral" variant="outline" icon="i-lucide-plus" @click="openMeta">
-        Meta (token do System User)
+        Meta (System User ou token de usuário)
       </UButton>
       <UButton color="neutral" variant="outline" icon="i-lucide-plus" @click="startYoutube">
         YouTube
@@ -291,9 +291,9 @@ async function connectMeta() {
         <div class="space-y-4">
           <UAlert v-if="metaError" color="error" variant="subtle" :description="metaError" />
           <UFormField
-            label="Token do System User"
+            label="Token do System User ou token de usuário long-lived"
             name="token"
-            help="Usado só para buscar e conectar; não fica guardado na tela."
+            help="Use um token de usuário long-lived (não o do Graph API Explorer, que dura cerca de 1 hora). Não fica guardado na tela."
           >
             <UInput
               v-model="metaToken"

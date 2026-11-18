@@ -44,7 +44,7 @@ Em **Usuários do sistema → Gerar token**, escolha o app e marque estes escopo
 
 O token pode ser **não expirante** ou de **60 dias**. A Meta recomenda o de 60 dias, com renovação ([facebook.md](../07-integracoes/facebook.md) §3.2); a Central **ainda não renova tokens sozinha** nesta fase, então anote a data de validade se escolher o de 60 dias.
 
-**Plano B:** se não der para usar System User, um **Page token long-lived** obtido pelo login de um administrador da Página também é aceito na mesma tela. Fica preso ao vínculo daquela pessoa com a Página.
+**Plano B:** se não der para usar System User, cole na mesma tela um **token de usuário long-lived** de um administrador da Página, obtido com `fb_exchange_token` ([facebook.md](../07-integracoes/facebook.md) §3.1, passo 2). A Central chama `/me/accounts` com ele, deriva o token de cada Página e guarda só o **token da Página**, cifrado. **Não cole um Page token**: `/me/accounts` falha com ele. **Atenção:** um token de usuário de curta duração, como o do Graph API Explorer, gera tokens de Página que expiram em cerca de 1 hora; troque-o por um long-lived antes. O vínculo fica preso à pessoa que gerou o token.
 
 ### Onde guardar o token
 
