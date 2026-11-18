@@ -59,7 +59,7 @@ describe('probe', () => {
 describe('extractAudioChunks', () => {
   it('com chunkSec 3 em vídeo de 8 s gera 3 blocos com offsets 0, 3000, 6000', async () => {
     const file = await makeVideo(dir, { seconds: 8, audio: 'tone' })
-    const chunks = await extractAudioChunks(file, join(dir, 'chunks'), 3)
+    const chunks = await extractAudioChunks(file, join(dir, 'chunks'), 8000, 3)
     expect(chunks.map((c) => c.offsetMs)).toEqual([0, 3000, 6000])
     for (const c of chunks) expect((await stat(c.path)).size).toBeGreaterThan(0)
   })
