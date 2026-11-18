@@ -14,12 +14,22 @@ import {
   MAX_DOWNLOAD_BYTES,
   type SourceDownloadJob,
 } from './handlers/source-download.js'
+import {
+  createSourceDeadLetterHandler,
+  type SourceDeadLetterJob,
+} from './handlers/source-dead-letter.js'
 import { createEchoHandler } from './handlers/system.js'
 import { startHeartbeat } from './heartbeat.js'
+import { STALE_SCRATCH_MS, sweepStaleScratch } from './scratch.js'
+
+/** Intervalo da varredura do scratch (sobras de jobs mortos). */
+const SCRATCH_SWEEP_MS = 30 * 60 * 1000
 
 export interface WorkerConfig {
   databaseUrl: string
   heartbeatMs?: number
+  /** Idade mínima das sobras apagadas do scratch (padrão STALE_SCRATCH_MS; só os testes mudam). */
+  staleScratchMs?: number
   logger?: Logger
 }
 
@@ -46,7 +56,23 @@ export async function startWorker(
   const db = createPrisma(cfg.databaseUrl)
   let queue: Awaited<ReturnType<typeof createPgBossQueue>> | undefined
   let heartbeat: ReturnType<typeof startHeartbeat> | undefined
+  let sweepTimer: ReturnType<typeof setInterval> | undefined
+  const sweep = async (root: string) => {
+    try {
+      const removed = await sweepStaleScratch(root, cfg.staleScratchMs ?? STALE_SCRATCH_MS)
+      if (removed.length) logger.warn({ removed }, 'sobras do scratch apagadas')
+    } catch (err) {
+      logger.error({ err }, 'falha ao varrer o scratch')
+    }
+  }
   try {
+    // Sobras de um worker que caiu (vídeos de GB): na subida e depois periodicamente.
+    const scratchRoot = deps.scratchRoot
+    if (scratchRoot) {
+      await sweep(scratchRoot)
+      sweepTimer = setInterval(() => void sweep(scratchRoot), SCRATCH_SWEEP_MS)
+      sweepTimer.unref()
+    }
     // role 'worker' instala/migra o schema pgboss: este processo sobe antes de qualquer web.
     queue = await createPgBossQueue({
       connectionString: cfg.databaseUrl,
@@ -54,6 +80,11 @@ export async function startWorker(
       onError: (err) => logger.error({ err }, 'pg-boss error'),
     })
     await queue.work(QUEUES.systemEcho, createEchoHandler(logger))
+    // Jobs de fonte que esgotaram os retries: a fonte vira `failed` (o usuário pode tentar de novo).
+    await queue.work<SourceDeadLetterJob['data']>(
+      QUEUES.sourceDeadLetter,
+      createSourceDeadLetterHandler({ db, queue, logger }),
+    )
     if (deps.storage && deps.scratchRoot) {
       // Uma análise por vez (limite global de entrada).
       await queue.work<SourceAnalyzeJob['data']>(
@@ -70,7 +101,8 @@ export async function startWorker(
         }),
         { concurrency: 1 },
       )
-      // Download por link atrás da chave: um por vez; sem retry automático (falha vira `failed`).
+      // Download por link atrás da chave: um por vez; erro do yt-dlp vira `failed` sem retry (o
+      // retry do pg-boss só cobre queda do worker ou expiração).
       if (deps.ytdlpEnabled) {
         await queue.work<SourceDownloadJob['data']>(
           QUEUES.sourceDownload,
@@ -101,6 +133,7 @@ export async function startWorker(
       logger,
     })
   } catch (err) {
+    clearInterval(sweepTimer)
     await heartbeat?.stop()
     await queue?.stop().catch(() => undefined)
     await db.$disconnect()
@@ -112,6 +145,7 @@ export async function startWorker(
   return {
     stop() {
       stopping ??= (async () => {
+        clearInterval(sweepTimer)
         await heartbeat?.stop()
         await queue?.stop()
         await db.$disconnect()
