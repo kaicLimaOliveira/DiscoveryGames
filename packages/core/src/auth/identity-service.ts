@@ -9,6 +9,7 @@ import {
   InvalidTotpError,
   LastAdminError,
   TooManyAttemptsError,
+  NotFoundError,
   ValidationError,
 } from '../errors.js'
 import { hashPassword, verifyPassword } from './password.js'
@@ -286,7 +287,7 @@ export function createIdentityService(deps: {
       await db.$transaction(async (tx) => {
         await lockActiveAdmins(tx)
         const target = await tx.user.findUnique({ where: { id: userId } })
-        if (!target) throw new ValidationError('Usuário não encontrado.')
+        if (!target) throw new NotFoundError('Usuário não encontrado.')
         const status = i.status ?? target.status
         const role = i.globalRole ?? target.role
         const wasActiveAdmin = target.role === 'admin' && target.status === 'active'
@@ -325,7 +326,7 @@ export function createIdentityService(deps: {
           tx.organization.findUnique({ where: { id: organizationId }, select: { id: true } }),
         ])
         if (!user || !organization)
-          throw new ValidationError('Usuário ou organização não encontrado.')
+          throw new NotFoundError('Usuário ou organização não encontrado.')
         if (role === null) {
           const { count } = await tx.organizationMember.deleteMany({
             where: { organizationId, userId },

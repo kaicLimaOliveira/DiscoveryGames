@@ -4,6 +4,7 @@ import {
   InvalidCredentialsError,
   InvalidTotpError,
   LastAdminError,
+  NotFoundError,
   TooManyAttemptsError,
   ValidationError,
 } from '@central/core'
@@ -35,6 +36,7 @@ export function toHttpError(event: H3Event, err: unknown): Error {
   if (err instanceof ConflictError || err instanceof LastAdminError) {
     return createError({ statusCode: 409, message: err.message })
   }
+  if (err instanceof NotFoundError) return createError({ statusCode: 404, message: err.message })
   if (err instanceof ValidationError) return createError({ statusCode: 422, message: err.message })
   if (err instanceof z.ZodError) {
     return createError({

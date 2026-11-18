@@ -48,7 +48,6 @@ interface Route {
 }
 
 const ROUTES: Route[] = [
-  { name: 'GET brands', method: 'GET', path: () => '/api/admin/brands' },
   { name: 'GET users', method: 'GET', path: () => '/api/admin/users' },
   {
     name: 'POST users',
@@ -63,15 +62,15 @@ const ROUTES: Route[] = [
     body: () => ({ name: 'Alvo Renomeado' }),
   },
   {
-    name: 'PUT brands/:organizationId/members/:userId',
+    name: 'PUT orgs/:orgId/members/:userId',
     method: 'PUT',
-    path: () => `/api/admin/brands/${organizationId}/members/${target.id}`,
+    path: () => `/api/orgs/${organizationId}/members/${target.id}`,
     body: () => ({ role: 'viewer' }),
   },
   {
-    name: 'DELETE brands/:organizationId/members/:userId',
+    name: 'DELETE orgs/:orgId/members/:userId',
     method: 'DELETE',
-    path: () => `/api/admin/brands/${organizationId}/members/${target.id}`,
+    path: () => `/api/orgs/${organizationId}/members/${target.id}`,
   },
 ]
 
@@ -167,36 +166,27 @@ describe('administração de usuários', () => {
   })
 
   it('PUT com papel inválido → 422', async () => {
-    const res = await clients.admin.request(
-      `/api/admin/brands/${organizationId}/members/${target.id}`,
-      {
-        method: 'PUT',
-        body: { role: 'dono' },
-      },
-    )
+    const res = await clients.admin.request(`/api/orgs/${organizationId}/members/${target.id}`, {
+      method: 'PUT',
+      body: { role: 'dono' },
+    })
     expect(res.status).toBe(422)
   })
 
   it('PUT grava o vínculo e DELETE o remove', async () => {
-    const put = await clients.admin.request(
-      `/api/admin/brands/${organizationId}/members/${target.id}`,
-      {
-        method: 'PUT',
-        body: { role: 'editor' },
-      },
-    )
+    const put = await clients.admin.request(`/api/orgs/${organizationId}/members/${target.id}`, {
+      method: 'PUT',
+      body: { role: 'editor' },
+    })
     expect(put.status).toBe(204)
     const member = await db.organizationMember.findUnique({
       where: { organizationId_userId: { organizationId, userId: target.id } },
     })
     expect(member?.role).toBe('editor')
 
-    const del = await clients.admin.request(
-      `/api/admin/brands/${organizationId}/members/${target.id}`,
-      {
-        method: 'DELETE',
-      },
-    )
+    const del = await clients.admin.request(`/api/orgs/${organizationId}/members/${target.id}`, {
+      method: 'DELETE',
+    })
     expect(del.status).toBe(204)
     const gone = await db.organizationMember.findUnique({
       where: { organizationId_userId: { organizationId, userId: target.id } },
@@ -230,13 +220,10 @@ describe('administração de usuários', () => {
     const session = await loggedIn(editor)
     expect((await session.request('/api/admin/users')).status).toBe(403)
 
-    const res = await clients.admin.request(
-      `/api/admin/brands/${organizationId}/members/${editor.id}`,
-      {
-        method: 'PUT',
-        body: { role: 'approver' },
-      },
-    )
+    const res = await clients.admin.request(`/api/orgs/${organizationId}/members/${editor.id}`, {
+      method: 'PUT',
+      body: { role: 'approver' },
+    })
     expect(res.status).toBe(204)
     expect((await session.request('/api/admin/users')).status).toBe(401)
 
@@ -274,16 +261,5 @@ describe('administração de usuários', () => {
     expect((await old.request('/api/admin/users')).status).toBe(401)
     // Um novo login funciona normalmente.
     expect((await (await loggedIn(user)).request('/api/admin/users')).status).toBe(403)
-  })
-})
-
-describe('GET /api/admin/brands', () => {
-  it('lista organizações com id, name e slug', async () => {
-    const res = await clients.admin.request('/api/admin/brands')
-    expect(res.status).toBe(200)
-    const brands = (res.body as { brands: Array<Record<string, unknown>> }).brands
-    const found = brands.find((b) => b.id === organizationId)
-    expect(found).toBeDefined()
-    expect(Object.keys(found!).sort()).toEqual(['id', 'name', 'slug'])
   })
 })

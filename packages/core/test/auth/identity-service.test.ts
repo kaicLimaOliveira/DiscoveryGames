@@ -13,6 +13,7 @@ import {
   InvalidCredentialsError,
   InvalidTotpError,
   LastAdminError,
+  NotFoundError,
   TooManyAttemptsError,
   ValidationError,
 } from '../../src/errors.js'
@@ -294,7 +295,7 @@ describe('senha e permissões', () => {
     expect(actions.filter((a) => a === 'member.upserted')).toHaveLength(2)
     expect(actions).toContain('member.removed')
     await expect(svc.setMembership(admin, GHOST, id, 'viewer')).rejects.toBeInstanceOf(
-      ValidationError,
+      NotFoundError,
     )
   })
 
@@ -305,9 +306,7 @@ describe('senha e permissões', () => {
     const u = await db!.prisma.user.findUniqueOrThrow({ where: { id } })
     expect(u).toMatchObject({ name: 'Novo', role: 'admin' })
     expect(await db!.prisma.auditLog.count({ where: { action: 'user.updated' } })).toBe(1)
-    await expect(svc.updateUser(admin, GHOST, { name: 'x' })).rejects.toBeInstanceOf(
-      ValidationError,
-    )
+    await expect(svc.updateUser(admin, GHOST, { name: 'x' })).rejects.toBeInstanceOf(NotFoundError)
   })
 })
 

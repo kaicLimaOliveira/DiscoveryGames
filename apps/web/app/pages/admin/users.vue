@@ -28,9 +28,9 @@ const roles = Object.entries(ROLE_LABELS) as Array<[OrganizationRole, string]>
 const { data: usersData, refresh: refreshUsers } = await useFetch<{ users: UserRow[] }>(
   '/api/admin/users',
 )
-const { data: orgsData } = await useFetch<{ brands: Organization[] }>('/api/admin/brands')
+const { data: orgsData } = await useFetch<{ organizations: Organization[] }>('/api/orgs')
 const users = computed(() => usersData.value?.users ?? [])
-const orgs = computed(() => orgsData.value?.brands ?? [])
+const orgs = computed(() => orgsData.value?.organizations ?? [])
 
 const selectedOrganizationId = ref(orgs.value[0]?.id ?? '')
 const error = ref('')
@@ -42,7 +42,7 @@ function orgRole(user: UserRow): string {
 
 async function setOrganizationRole(user: UserRow, role: string) {
   error.value = ''
-  const base = `/api/admin/brands/${selectedOrganizationId.value}/members/${user.id}`
+  const base = `/api/orgs/${selectedOrganizationId.value}/members/${user.id}`
   try {
     if (role) await $fetch(base, { method: 'PUT', body: { role } })
     else await $fetch(base, { method: 'DELETE' })
@@ -101,7 +101,7 @@ async function create() {
       },
     })
     if (form.role && selectedOrganizationId.value) {
-      await $fetch(`/api/admin/brands/${selectedOrganizationId.value}/members/${id}`, {
+      await $fetch(`/api/orgs/${selectedOrganizationId.value}/members/${id}`, {
         method: 'PUT',
         body: { role: form.role },
       })

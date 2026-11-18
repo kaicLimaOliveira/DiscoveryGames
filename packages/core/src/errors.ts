@@ -46,3 +46,9 @@ export class ValidationError extends DomainError {
     super('VALIDATION', message, options)
   }
 }
+
+export class NotFoundError extends DomainError {
+  constructor(message = 'Recurso não encontrado.', options?: ErrorOptions) {
+    super('NOT_FOUND', message, options)
+  }
+}

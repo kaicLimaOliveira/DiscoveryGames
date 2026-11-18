@@ -1,4 +1,10 @@
-import { createIdentityService, createLoginRateLimiter, type IdentityService } from '@central/core'
+import {
+  createIdentityService,
+  createLoginRateLimiter,
+  createOrganizationService,
+  type IdentityService,
+  type OrganizationService,
+} from '@central/core'
 import { createPgBossQueue, createPrisma, type Db, type PgBossQueue } from '@central/db'
 import { createCipher, createLogger } from '@central/shared'
 import { createStorage, type Storage } from '@central/storage'
@@ -9,6 +15,7 @@ export type Logger = ReturnType<typeof createLogger>
 export interface Services {
   db: Db
   identity: IdentityService
+  organizations: OrganizationService
   storage: Storage
   /** Fila pg-boss (papel `web`, sem migrações), conectada na primeira chamada. */
   queue(): Promise<PgBossQueue>
@@ -32,10 +39,12 @@ export function useServices(): Services {
     limiter,
     totpIssuer: config.TOTP_ISSUER,
   })
+  const organizations = createOrganizationService({ db })
   const storage = createStorage(config)
   services = {
     db,
     identity,
+    organizations,
     storage,
     logger,
     queue() {

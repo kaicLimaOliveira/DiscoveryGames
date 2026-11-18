@@ -8,6 +8,7 @@ export type Action =
   | 'accounts.manage'
   | 'settings.manage'
   | 'users.manage'
+  | 'organizations.create'
 
 export const ACTION_MIN_ROLE: Record<Action, OrganizationRole> = {
   'library.read': 'viewer',
@@ -17,6 +18,7 @@ export const ACTION_MIN_ROLE: Record<Action, OrganizationRole> = {
   'accounts.manage': 'admin',
   'settings.manage': 'admin',
   'users.manage': 'admin',
+  'organizations.create': 'admin',
 }
 
 export type Actor = {

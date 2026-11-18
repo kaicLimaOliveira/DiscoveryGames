@@ -7,6 +7,7 @@ import {
   InvalidCredentialsError,
   InvalidTotpError,
   LastAdminError,
+  NotFoundError,
   TooManyAttemptsError,
   ValidationError,
 } from '../src/errors.js'
@@ -20,6 +21,7 @@ it('cada erro tem código estável e é DomainError/AppError', () => {
     [new ConflictError(), 'CONFLICT'],
     [new LastAdminError(), 'LAST_ADMIN'],
     [new ValidationError('x'), 'VALIDATION'],
+    [new NotFoundError(), 'NOT_FOUND'],
   ]
   for (const [e, code] of list) {
     expect(e.code).toBe(code)

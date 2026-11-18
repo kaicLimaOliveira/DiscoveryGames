@@ -15,6 +15,7 @@ const MATRIX: Record<Action, Record<Role, boolean>> = {
   'accounts.manage': { viewer: false, editor: false, approver: false, admin: true },
   'settings.manage': { viewer: false, editor: false, approver: false, admin: true },
   'users.manage': { viewer: false, editor: false, approver: false, admin: true },
+  'organizations.create': { viewer: false, editor: false, approver: false, admin: true },
 }
 
 const cases = (Object.keys(MATRIX) as Action[]).flatMap((action) =>
