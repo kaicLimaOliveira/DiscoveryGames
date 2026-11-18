@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   Client,
   PASSWORD,
-  createBrand,
+  createOrganization,
   createUser,
   db,
   loggedIn,
@@ -13,17 +13,21 @@ import {
 
 await setupServer()
 
-let brandId: string
+let organizationId: string
 let target: TestUser
 const clients: Record<'viewer' | 'editor' | 'approver' | 'admin', Client> = {} as never
 
 beforeAll(async () => {
-  brandId = (await createBrand()).id
+  organizationId = (await createOrganization()).id
   target = await createUser({ prefix: 'alvo' })
   const [viewer, editor, approver, admin] = await Promise.all([
-    createUser({ prefix: 'viewer', memberships: [{ brandId, role: 'viewer' }] }),
-    createUser({ prefix: 'editor', memberships: [{ brandId, role: 'editor' }] }),
-    createUser({ prefix: 'approver', memberships: [{ brandId, role: 'approver' }], totp: true }),
+    createUser({ prefix: 'viewer', memberships: [{ organizationId, role: 'viewer' }] }),
+    createUser({ prefix: 'editor', memberships: [{ organizationId, role: 'editor' }] }),
+    createUser({
+      prefix: 'approver',
+      memberships: [{ organizationId, role: 'approver' }],
+      totp: true,
+    }),
     createUser({ prefix: 'admin', role: 'admin', totp: true }),
   ])
   clients.viewer = await loggedIn(viewer)
@@ -59,15 +63,15 @@ const ROUTES: Route[] = [
     body: () => ({ name: 'Alvo Renomeado' }),
   },
   {
-    name: 'PUT brands/:brandId/members/:userId',
+    name: 'PUT brands/:organizationId/members/:userId',
     method: 'PUT',
-    path: () => `/api/admin/brands/${brandId}/members/${target.id}`,
+    path: () => `/api/admin/brands/${organizationId}/members/${target.id}`,
     body: () => ({ role: 'viewer' }),
   },
   {
-    name: 'DELETE brands/:brandId/members/:userId',
+    name: 'DELETE brands/:organizationId/members/:userId',
     method: 'DELETE',
-    path: () => `/api/admin/brands/${brandId}/members/${target.id}`,
+    path: () => `/api/admin/brands/${organizationId}/members/${target.id}`,
   },
 ]
 
@@ -163,30 +167,39 @@ describe('administração de usuários', () => {
   })
 
   it('PUT com papel inválido → 422', async () => {
-    const res = await clients.admin.request(`/api/admin/brands/${brandId}/members/${target.id}`, {
-      method: 'PUT',
-      body: { role: 'dono' },
-    })
+    const res = await clients.admin.request(
+      `/api/admin/brands/${organizationId}/members/${target.id}`,
+      {
+        method: 'PUT',
+        body: { role: 'dono' },
+      },
+    )
     expect(res.status).toBe(422)
   })
 
   it('PUT grava o vínculo e DELETE o remove', async () => {
-    const put = await clients.admin.request(`/api/admin/brands/${brandId}/members/${target.id}`, {
-      method: 'PUT',
-      body: { role: 'editor' },
-    })
+    const put = await clients.admin.request(
+      `/api/admin/brands/${organizationId}/members/${target.id}`,
+      {
+        method: 'PUT',
+        body: { role: 'editor' },
+      },
+    )
     expect(put.status).toBe(204)
-    const member = await db.brandMember.findUnique({
-      where: { brandId_userId: { brandId, userId: target.id } },
+    const member = await db.organizationMember.findUnique({
+      where: { organizationId_userId: { organizationId, userId: target.id } },
     })
     expect(member?.role).toBe('editor')
 
-    const del = await clients.admin.request(`/api/admin/brands/${brandId}/members/${target.id}`, {
-      method: 'DELETE',
-    })
+    const del = await clients.admin.request(
+      `/api/admin/brands/${organizationId}/members/${target.id}`,
+      {
+        method: 'DELETE',
+      },
+    )
     expect(del.status).toBe(204)
-    const gone = await db.brandMember.findUnique({
-      where: { brandId_userId: { brandId, userId: target.id } },
+    const gone = await db.organizationMember.findUnique({
+      where: { organizationId_userId: { organizationId, userId: target.id } },
     })
     expect(gone).toBeNull()
   })
@@ -194,7 +207,7 @@ describe('administração de usuários', () => {
   it('usuário desativado com sessão ativa recebe 401 na próxima requisição', async () => {
     const victim = await createUser({
       prefix: 'desativado',
-      memberships: [{ brandId, role: 'editor' }],
+      memberships: [{ organizationId, role: 'editor' }],
     })
     const session = await loggedIn(victim)
     expect((await session.request('/api/admin/users')).status).toBe(403)
@@ -212,15 +225,18 @@ describe('administração de usuários', () => {
   it('promoção a approver durante a sessão revoga o cookie (novo login exige 2FA)', async () => {
     const editor = await createUser({
       prefix: 'promovido',
-      memberships: [{ brandId, role: 'editor' }],
+      memberships: [{ organizationId, role: 'editor' }],
     })
     const session = await loggedIn(editor)
     expect((await session.request('/api/admin/users')).status).toBe(403)
 
-    const res = await clients.admin.request(`/api/admin/brands/${brandId}/members/${editor.id}`, {
-      method: 'PUT',
-      body: { role: 'approver' },
-    })
+    const res = await clients.admin.request(
+      `/api/admin/brands/${organizationId}/members/${editor.id}`,
+      {
+        method: 'PUT',
+        body: { role: 'approver' },
+      },
+    )
     expect(res.status).toBe(204)
     expect((await session.request('/api/admin/users')).status).toBe(401)
 
@@ -231,7 +247,7 @@ describe('administração de usuários', () => {
   it('promoção a admin global durante a sessão → 401, não 200', async () => {
     const editor = await createUser({
       prefix: 'promovido-admin',
-      memberships: [{ brandId, role: 'editor' }],
+      memberships: [{ organizationId, role: 'editor' }],
     })
     const session = await loggedIn(editor)
     const res = await clients.admin.request(`/api/admin/users/${editor.id}`, {
@@ -245,7 +261,7 @@ describe('administração de usuários', () => {
   it('desativar e reativar não revive o cookie antigo', async () => {
     const user = await createUser({
       prefix: 'reativado',
-      memberships: [{ brandId, role: 'editor' }],
+      memberships: [{ organizationId, role: 'editor' }],
     })
     const old = await loggedIn(user)
     for (const status of ['disabled', 'active']) {
@@ -262,11 +278,11 @@ describe('administração de usuários', () => {
 })
 
 describe('GET /api/admin/brands', () => {
-  it('lista marcas com id, name e slug', async () => {
+  it('lista organizações com id, name e slug', async () => {
     const res = await clients.admin.request('/api/admin/brands')
     expect(res.status).toBe(200)
     const brands = (res.body as { brands: Array<Record<string, unknown>> }).brands
-    const found = brands.find((b) => b.id === brandId)
+    const found = brands.find((b) => b.id === organizationId)
     expect(found).toBeDefined()
     expect(Object.keys(found!).sort()).toEqual(['id', 'name', 'slug'])
   })

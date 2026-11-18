@@ -15,12 +15,12 @@ export interface BootstrapCliDeps {
 const OPTIONS = {
   email: { type: 'string' },
   name: { type: 'string' },
-  'brand-name': { type: 'string' },
-  'brand-slug': { type: 'string' },
+  'org-name': { type: 'string' },
+  'org-slug': { type: 'string' },
 } as const
 
 const USAGE =
-  'Uso: pnpm bootstrap:admin -- --email <e-mail> --name <nome> --brand-name <marca> --brand-slug <slug>'
+  'Uso: pnpm bootstrap:admin -- --email <e-mail> --name <nome> --org-name <organização> --org-slug <slug>'
 
 /** Retorna o código de saída: 0 ok, 1 conflito (já há admin), 2 uso incorreto. */
 export async function runBootstrapCli(argv: string[], deps: BootstrapCliDeps): Promise<number> {
@@ -44,8 +44,8 @@ export async function runBootstrapCli(argv: string[], deps: BootstrapCliDeps): P
     const { password } = await bootstrapAdmin(deps.db, {
       email: values.email!,
       name: values.name!,
-      brandName: values['brand-name']!,
-      brandSlug: values['brand-slug']!,
+      orgName: values['org-name']!,
+      orgSlug: values['org-slug']!,
     })
     deps.out(`Administrador criado: ${normalizeEmail(values.email!)}`)
     deps.out(`Senha: ${password}`)

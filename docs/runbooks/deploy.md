@@ -75,7 +75,7 @@ Roda no container do worker (o CLI está empacotado em `dist/bootstrap-admin.js`
 
 ```bash
 docker compose -f compose.prod.yaml --env-file .env exec worker node dist/bootstrap-admin.js \
-  --email <e-mail> --name "<nome>" --brand-name "<marca>" --brand-slug <slug>
+  --email <e-mail> --name "<nome>" --org-name "<organização>" --org-slug <slug>
 ```
 
 O CLI imprime a senha temporária. No primeiro login, trocar a senha e configurar o 2FA (TOTP).

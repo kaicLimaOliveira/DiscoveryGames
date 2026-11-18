@@ -26,12 +26,12 @@ it('job enviado dentro da transação some no rollback', async () => {
   const q = await newQueue()
   await expect(
     db!.prisma.$transaction(async (tx) => {
-      await tx.brand.create({ data: { name: 'R', slug: 'r' } })
+      await tx.organization.create({ data: { name: 'R', slug: 'r' } })
       await q.send(QUEUES.systemEcho, { tag: 'rollback-1' }, { db: sqlExecutorFor(tx) })
       throw new Error('rollback')
     }),
   ).rejects.toThrow('rollback')
-  expect(await db!.prisma.brand.count({ where: { slug: 'r' } })).toBe(0)
+  expect(await db!.prisma.organization.count({ where: { slug: 'r' } })).toBe(0)
   const rows = await db!.prisma.$queryRawUnsafe<unknown[]>(
     `select 1 from pgboss.job where name = 'system.echo' and data->>'tag' = 'rollback-1'`,
   )

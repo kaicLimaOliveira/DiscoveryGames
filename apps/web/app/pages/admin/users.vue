@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useHead({ title: 'Usuários' })
 
-type BrandRole = 'viewer' | 'editor' | 'approver' | 'admin'
+type OrganizationRole = 'viewer' | 'editor' | 'approver' | 'admin'
 interface UserRow {
   id: string
   email: string
@@ -9,40 +9,40 @@ interface UserRow {
   role: 'admin' | 'member'
   status: 'active' | 'disabled'
   totpEnabled: boolean
-  memberships: Array<{ brandId: string; role: BrandRole }>
+  memberships: Array<{ organizationId: string; role: OrganizationRole }>
 }
-interface Brand {
+interface Organization {
   id: string
   name: string
   slug: string
 }
 
-const ROLE_LABELS: Record<BrandRole, string> = {
+const ROLE_LABELS: Record<OrganizationRole, string> = {
   viewer: 'Leitor',
   editor: 'Editor',
   approver: 'Aprovador',
-  admin: 'Administrador da marca',
+  admin: 'Administrador da organização',
 }
-const roles = Object.entries(ROLE_LABELS) as Array<[BrandRole, string]>
+const roles = Object.entries(ROLE_LABELS) as Array<[OrganizationRole, string]>
 
 const { data: usersData, refresh: refreshUsers } = await useFetch<{ users: UserRow[] }>(
   '/api/admin/users',
 )
-const { data: brandsData } = await useFetch<{ brands: Brand[] }>('/api/admin/brands')
+const { data: orgsData } = await useFetch<{ brands: Organization[] }>('/api/admin/brands')
 const users = computed(() => usersData.value?.users ?? [])
-const brands = computed(() => brandsData.value?.brands ?? [])
+const orgs = computed(() => orgsData.value?.brands ?? [])
 
-const selectedBrandId = ref(brands.value[0]?.id ?? '')
+const selectedOrganizationId = ref(orgs.value[0]?.id ?? '')
 const error = ref('')
 const notice = ref('')
 
-function brandRole(user: UserRow): string {
-  return user.memberships.find((m) => m.brandId === selectedBrandId.value)?.role ?? ''
+function orgRole(user: UserRow): string {
+  return user.memberships.find((m) => m.organizationId === selectedOrganizationId.value)?.role ?? ''
 }
 
-async function setBrandRole(user: UserRow, role: string) {
+async function setOrganizationRole(user: UserRow, role: string) {
   error.value = ''
-  const base = `/api/admin/brands/${selectedBrandId.value}/members/${user.id}`
+  const base = `/api/admin/brands/${selectedOrganizationId.value}/members/${user.id}`
   try {
     if (role) await $fetch(base, { method: 'PUT', body: { role } })
     else await $fetch(base, { method: 'DELETE' })
@@ -100,8 +100,8 @@ async function create() {
         globalRole: form.globalRole,
       },
     })
-    if (form.role && selectedBrandId.value) {
-      await $fetch(`/api/admin/brands/${selectedBrandId.value}/members/${id}`, {
+    if (form.role && selectedOrganizationId.value) {
+      await $fetch(`/api/admin/brands/${selectedOrganizationId.value}/members/${id}`, {
         method: 'PUT',
         body: { role: form.role },
       })
@@ -139,10 +139,10 @@ const selectClass =
     />
 
     <div class="flex items-center gap-2 text-sm">
-      <label for="brand-filter">Marca (papéis exibidos):</label>
-      <select id="brand-filter" v-model="selectedBrandId" :class="[selectClass, 'max-w-xs']">
-        <option v-if="!brands.length" value="">Nenhuma marca cadastrada</option>
-        <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.name }}</option>
+      <label for="org-filter">Organização (papéis exibidos):</label>
+      <select id="org-filter" v-model="selectedOrganizationId" :class="[selectClass, 'max-w-xs']">
+        <option v-if="!orgs.length" value="">Nenhuma organização cadastrada</option>
+        <option v-for="b in orgs" :key="b.id" :value="b.id">{{ b.name }}</option>
       </select>
     </div>
 
@@ -155,7 +155,7 @@ const selectClass =
             <th class="px-3 py-2">Perfil</th>
             <th class="px-3 py-2">2FA</th>
             <th class="px-3 py-2">Situação</th>
-            <th class="px-3 py-2">Papel na marca</th>
+            <th class="px-3 py-2">Papel na organização</th>
             <th class="px-3 py-2"></th>
           </tr>
         </thead>
@@ -172,11 +172,11 @@ const selectClass =
             </td>
             <td class="px-3 py-2">
               <select
-                :aria-label="`Papel de ${u.email} na marca`"
+                :aria-label="`Papel de ${u.email} na organização`"
                 :class="selectClass"
-                :disabled="!selectedBrandId"
-                :value="brandRole(u)"
-                @change="setBrandRole(u, ($event.target as HTMLSelectElement).value)"
+                :disabled="!selectedOrganizationId"
+                :value="orgRole(u)"
+                @change="setOrganizationRole(u, ($event.target as HTMLSelectElement).value)"
               >
                 <option value="">Sem acesso</option>
                 <option v-for="[value, label] in roles" :key="value" :value="value">
@@ -225,14 +225,14 @@ const selectClass =
             </select>
           </div>
           <div class="space-y-1">
-            <label for="new-brand-role" class="text-sm font-medium">Papel na marca</label>
-            <select id="new-brand-role" v-model="form.role" :class="selectClass">
+            <label for="new-org-role" class="text-sm font-medium">Papel na organização</label>
+            <select id="new-org-role" v-model="form.role" :class="selectClass">
               <option value="">Sem acesso</option>
               <option v-for="[value, label] in roles" :key="value" :value="value">
                 {{ label }}
               </option>
             </select>
-            <p class="text-xs text-muted">Aplicado à marca selecionada na listagem.</p>
+            <p class="text-xs text-muted">Aplicado à organização selecionada na listagem.</p>
           </div>
         </form>
       </template>

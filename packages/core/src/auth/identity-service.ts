@@ -1,4 +1,4 @@
-import type { BrandRole, Db, DbOrTx, GlobalRole, Tx, UserStatus } from '@central/db'
+import type { OrganizationRole, Db, DbOrTx, GlobalRole, Tx, UserStatus } from '@central/db'
 import type { SecretCipher } from '@central/shared'
 import { writeAudit } from '../audit.js'
 import { can, requires2fa, type Actor } from '../authz/roles.js'
@@ -38,9 +38,9 @@ export interface IdentityService {
   ): Promise<void>
   setMembership(
     actor: Actor,
-    brandId: string,
+    organizationId: string,
     userId: string,
-    role: BrandRole | null,
+    role: OrganizationRole | null,
   ): Promise<void>
   listUsers(actor: Actor): Promise<
     Array<{
@@ -50,7 +50,7 @@ export interface IdentityService {
       role: GlobalRole
       status: UserStatus
       totpEnabled: boolean
-      memberships: Array<{ brandId: string; role: BrandRole }>
+      memberships: Array<{ organizationId: string; role: OrganizationRole }>
     }>
   >
 }
@@ -129,7 +129,7 @@ export function createIdentityService(deps: {
 
       const user = await db.user.findUnique({
         where: { email },
-        include: { memberships: { select: { brandId: true, role: true } } },
+        include: { memberships: { select: { organizationId: true, role: true } } },
       })
       const ok = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), password)
       if (!user || !ok || user.status === 'disabled') {
@@ -317,39 +317,42 @@ export function createIdentityService(deps: {
       })
     },
 
-    async setMembership(actor, brandId, userId, role) {
+    async setMembership(actor, organizationId, userId, role) {
       requireManage(actor)
       await db.$transaction(async (tx) => {
-        const [user, brand] = await Promise.all([
+        const [user, organization] = await Promise.all([
           tx.user.findUnique({ where: { id: userId }, select: { id: true } }),
-          tx.brand.findUnique({ where: { id: brandId }, select: { id: true } }),
+          tx.organization.findUnique({ where: { id: organizationId }, select: { id: true } }),
         ])
-        if (!user || !brand) throw new ValidationError('Usuário ou marca não encontrado.')
+        if (!user || !organization)
+          throw new ValidationError('Usuário ou organização não encontrado.')
         if (role === null) {
-          const { count } = await tx.brandMember.deleteMany({ where: { brandId, userId } })
+          const { count } = await tx.organizationMember.deleteMany({
+            where: { organizationId, userId },
+          })
           if (count === 0) return
           await revokeSessions(tx, userId)
           await writeAudit(tx, {
             action: 'member.removed',
-            entityType: 'brand_member',
+            entityType: 'organization_member',
             entityId: userId,
             userId: actor.userId,
-            brandId,
+            organizationId,
           })
           return
         }
-        await tx.brandMember.upsert({
-          where: { brandId_userId: { brandId, userId } },
-          create: { brandId, userId, role },
+        await tx.organizationMember.upsert({
+          where: { organizationId_userId: { organizationId, userId } },
+          create: { organizationId, userId, role },
           update: { role },
         })
         await revokeSessions(tx, userId)
         await writeAudit(tx, {
           action: 'member.upserted',
-          entityType: 'brand_member',
+          entityType: 'organization_member',
           entityId: userId,
           userId: actor.userId,
-          brandId,
+          organizationId,
           diff: { role },
         })
       })
@@ -359,7 +362,7 @@ export function createIdentityService(deps: {
       requireManage(actor)
       const users = await db.user.findMany({
         orderBy: { email: 'asc' },
-        include: { memberships: { select: { brandId: true, role: true } } },
+        include: { memberships: { select: { organizationId: true, role: true } } },
       })
       return users.map((u) => ({
         id: u.id,

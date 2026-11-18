@@ -29,7 +29,7 @@ async function createUserViaUi(
   await dialog.getByLabel('Nome').fill(u.name)
   await dialog.getByLabel('E-mail').fill(u.email)
   await dialog.getByLabel('Senha inicial').fill(PASSWORD)
-  await dialog.getByLabel('Papel na marca').selectOption(u.role)
+  await dialog.getByLabel('Papel na organização').selectOption(u.role)
   await dialog.getByRole('button', { name: 'Criar' }).click()
   await expect(page.getByTestId('user-row').filter({ hasText: u.email })).toBeVisible()
 }

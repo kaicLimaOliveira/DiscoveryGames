@@ -99,11 +99,11 @@ export async function requireActor(
 
 export async function requirePermission(
   event: H3Event,
-  brandId: string | null,
+  organizationId: string | null,
   action: Action,
 ): Promise<Actor> {
   const actor = await requireActor(event)
-  if (!can(actor, brandId, action)) {
+  if (!can(actor, organizationId, action)) {
     throw createError({ statusCode: 403, message: 'Você não tem permissão para esta ação.' })
   }
   return actor

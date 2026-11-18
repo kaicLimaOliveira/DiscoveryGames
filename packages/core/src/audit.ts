@@ -7,7 +7,7 @@ export async function writeAudit(
     entityType: string
     entityId?: string
     userId?: string
-    brandId?: string
+    organizationId?: string
     diff?: unknown
     ip?: string
   },
@@ -18,7 +18,7 @@ export async function writeAudit(
       entityType: e.entityType,
       entityId: e.entityId,
       userId: e.userId,
-      brandId: e.brandId,
+      organizationId: e.organizationId,
       // JSON arbitrário; undefined vira NULL no banco.
       diff: e.diff === undefined ? undefined : (e.diff as never),
       ip: e.ip,

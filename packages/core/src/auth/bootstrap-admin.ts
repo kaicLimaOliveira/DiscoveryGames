@@ -13,10 +13,10 @@ function generatePassword(length = 20): string {
   return out
 }
 
-/** Cria a primeira marca e o admin global. Lança ConflictError se já houver admin. */
+/** Cria a primeira organização e o admin global. Lança ConflictError se já houver admin. */
 export async function bootstrapAdmin(
   db: Db,
-  i: { email: string; name: string; brandName: string; brandSlug: string },
+  i: { email: string; name: string; orgName: string; orgSlug: string },
 ): Promise<{ password: string }> {
   const password = generatePassword()
   const passwordHash = await hashPassword(password)
@@ -28,27 +28,29 @@ export async function bootstrapAdmin(
       if ((await tx.user.count({ where: { role: 'admin' } })) > 0) {
         throw new ConflictError('Já existe um administrador global.')
       }
-      const brand = await tx.brand.create({ data: { name: i.brandName, slug: i.brandSlug } })
+      const organization = await tx.organization.create({
+        data: { name: i.orgName, slug: i.orgSlug },
+      })
       const user = await tx.user.create({
         data: {
           email,
           name: i.name.trim(),
           passwordHash,
           role: 'admin',
-          memberships: { create: { brandId: brand.id, role: 'admin' } },
+          memberships: { create: { organizationId: organization.id, role: 'admin' } },
         },
       })
       await writeAudit(tx, {
         action: 'user.created',
         entityType: 'user',
         entityId: user.id,
-        brandId: brand.id,
+        organizationId: organization.id,
         diff: { email, name: user.name, role: 'admin', bootstrap: true },
       })
     })
   } catch (err) {
     if (isUniqueViolation(err)) {
-      throw new ConflictError('Já existe usuário ou marca com este e-mail ou slug.')
+      throw new ConflictError('Já existe usuário ou organização com este e-mail ou slug.')
     }
     throw err
   }

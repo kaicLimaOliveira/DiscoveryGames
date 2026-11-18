@@ -7,13 +7,13 @@ export async function loadActor(
 ): Promise<(Actor & { sessionVersion: number }) | null> {
   const user = await db.user.findUnique({
     where: { id: userId },
-    include: { memberships: { select: { brandId: true, role: true } } },
+    include: { memberships: { select: { organizationId: true, role: true } } },
   })
   if (!user || user.status === 'disabled') return null
   return {
     userId: user.id,
     globalRole: user.role,
-    memberships: user.memberships.map((m) => ({ brandId: m.brandId, role: m.role })),
+    memberships: user.memberships.map((m) => ({ organizationId: m.organizationId, role: m.role })),
     sessionVersion: user.sessionVersion,
   }
 }

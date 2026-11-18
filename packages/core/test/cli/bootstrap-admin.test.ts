@@ -14,14 +14,14 @@ afterAll(() => db?.stop())
 beforeEach(async () => {
   const p = db!.prisma
   await p.auditLog.deleteMany()
-  await p.brandMember.deleteMany()
+  await p.organizationMember.deleteMany()
   await p.user.deleteMany()
-  await p.brand.deleteMany()
+  await p.organization.deleteMany()
 })
 
-const input = { email: ' Root@X.com ', name: 'Root', brandName: 'Marca', brandSlug: 'marca' }
+const input = { email: ' Root@X.com ', name: 'Root', orgName: 'Marca', orgSlug: 'marca' }
 
-it('cria a marca e o admin; a segunda execução lança ConflictError', async () => {
+it('cria a organização e o admin; a segunda execução lança ConflictError', async () => {
   const { password } = await bootstrapAdmin(db!.prisma, input)
   expect(password).toHaveLength(20)
   const user = await db!.prisma.user.findUniqueOrThrow({
@@ -32,15 +32,15 @@ it('cria a marca e o admin; a segunda execução lança ConflictError', async ()
   expect(await verifyPassword(user.passwordHash, password)).toBe(true)
   expect(user.memberships).toHaveLength(1)
   expect(user.memberships[0]!.role).toBe('admin')
-  expect(await db!.prisma.brand.count()).toBe(1)
+  expect(await db!.prisma.organization.count()).toBe(1)
   await expect(bootstrapAdmin(db!.prisma, input)).rejects.toBeInstanceOf(ConflictError)
-  expect(await db!.prisma.brand.count()).toBe(1)
+  expect(await db!.prisma.organization.count()).toBe(1)
 })
 
 it('bootstraps concorrentes: só um vence', async () => {
   const r = await Promise.allSettled([
     bootstrapAdmin(db!.prisma, input),
-    bootstrapAdmin(db!.prisma, { ...input, email: 'o@x.com', brandSlug: 'outra' }),
+    bootstrapAdmin(db!.prisma, { ...input, email: 'o@x.com', orgSlug: 'outra' }),
   ])
   expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1)
   expect(await db!.prisma.user.count({ where: { role: 'admin' } })).toBe(1)
@@ -56,16 +56,7 @@ function capture() {
   }
 }
 
-const args = [
-  '--email',
-  'cli@x.com',
-  '--name',
-  'Cli',
-  '--brand-name',
-  'Marca',
-  '--brand-slug',
-  'cli',
-]
+const args = ['--email', 'cli@x.com', '--name', 'Cli', '--org-name', 'Marca', '--org-slug', 'cli']
 
 it('CLI imprime a senha uma vez e retorna 0; tolera "--" inicial', async () => {
   const c = capture()
@@ -89,6 +80,6 @@ it('CLI retorna 1 com mensagem clara em ConflictError', async () => {
 it('CLI com argumentos faltando retorna 2 e mostra o uso', async () => {
   const c = capture()
   expect(await runBootstrapCli(['--email', 'x@x.com'], c.deps)).toBe(2)
-  expect(c.err.join('\n')).toMatch(/--brand-slug/)
+  expect(c.err.join('\n')).toMatch(/--org-slug/)
   expect(await runBootstrapCli(['--bogus'], capture().deps)).toBe(2)
 })

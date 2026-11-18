@@ -1,10 +1,10 @@
 export { createPrisma } from './client.js'
 export type { Db, Tx, DbOrTx } from './client.js'
-export { GlobalRole, UserStatus, BrandRole } from './generated/prisma/enums.js'
+export { GlobalRole, UserStatus, OrganizationRole } from './generated/prisma/enums.js'
 export type {
   User,
-  Brand,
-  BrandMember,
+  Organization,
+  OrganizationMember,
   Setting,
   AuditLog,
   Heartbeat,

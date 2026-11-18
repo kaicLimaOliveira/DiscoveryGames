@@ -10,20 +10,20 @@ afterAll(() => db?.stop())
 
 it('carrega papel global, memberships e sessionVersion', async () => {
   const p = db!.prisma
-  const brand = await p.brand.create({ data: { name: 'B', slug: 'b' } })
+  const organization = await p.organization.create({ data: { name: 'B', slug: 'b' } })
   const user = await p.user.create({
     data: {
       email: 'a@x.com',
       name: 'A',
       passwordHash: 'h',
       sessionVersion: 3,
-      memberships: { create: { brandId: brand.id, role: 'approver' } },
+      memberships: { create: { organizationId: organization.id, role: 'approver' } },
     },
   })
   expect(await loadActor(p, user.id)).toEqual({
     userId: user.id,
     globalRole: 'member',
-    memberships: [{ brandId: brand.id, role: 'approver' }],
+    memberships: [{ organizationId: organization.id, role: 'approver' }],
     sessionVersion: 3,
   })
 })

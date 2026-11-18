@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { generateTotpSecret, hashPassword } from '@central/core'
-import { createPrisma, type BrandRole, type GlobalRole } from '@central/db'
+import { createPrisma, type OrganizationRole, type GlobalRole } from '@central/db'
 import { createCipher, cryptoEnvSchema, loadConfig } from '@central/shared'
 import { fetch, setup } from '@nuxt/test-utils/e2e'
 import { Secret, TOTP } from 'otpauth'
@@ -35,9 +35,9 @@ export function uniqueIp(): string {
   return `10.${b()}.${b()}.${b()}`
 }
 
-export async function createBrand(): Promise<{ id: string }> {
-  const slug = `marca-${randomUUID().slice(0, 8)}`
-  return db.brand.create({ data: { name: slug, slug }, select: { id: true } })
+export async function createOrganization(): Promise<{ id: string }> {
+  const slug = `org-${randomUUID().slice(0, 8)}`
+  return db.organization.create({ data: { name: slug, slug }, select: { id: true } })
 }
 
 export interface TestUser {
@@ -50,7 +50,7 @@ export interface TestUser {
 export async function createUser(opts: {
   prefix: string
   role?: GlobalRole
-  memberships?: Array<{ brandId: string; role: BrandRole }>
+  memberships?: Array<{ organizationId: string; role: OrganizationRole }>
   totp?: boolean
 }): Promise<TestUser> {
   const email = uniqueEmail(opts.prefix)

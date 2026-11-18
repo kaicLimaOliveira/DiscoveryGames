@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { can, requires2fa, type Action, type Actor } from '../../src/authz/roles.js'
 
-const B1 = 'brand-1'
-const B2 = 'brand-2'
+const B1 = 'org-1'
+const B2 = 'org-2'
 
 type Role = 'viewer' | 'editor' | 'approver' | 'admin'
 
@@ -26,7 +26,7 @@ const cases = (Object.keys(MATRIX) as Action[]).flatMap((action) =>
 const member = (role: Role): Actor => ({
   userId: 'u',
   globalRole: 'member',
-  memberships: [{ brandId: B1, role }],
+  memberships: [{ organizationId: B1, role }],
 })
 const globalAdmin: Actor = { userId: 'a', globalRole: 'admin', memberships: [] }
 
@@ -35,16 +35,16 @@ describe('can', () => {
     expect(can(member(role), B1, action)).toBe(expected)
   })
 
-  it('membro de uma marca não age em outra marca', () => {
+  it('membro de uma organização não age em outra organização', () => {
     expect(can(member('admin'), B2, 'library.read')).toBe(false)
   })
 
-  it('brandId null só vale para admin global', () => {
+  it('organizationId null só vale para admin global', () => {
     expect(can(member('admin'), null, 'library.read')).toBe(false)
     expect(can(globalAdmin, null, 'users.manage')).toBe(true)
   })
 
-  it('admin global pode tudo em qualquer marca', () => {
+  it('admin global pode tudo em qualquer organização', () => {
     for (const action of Object.keys(MATRIX) as Action[]) {
       expect(can(globalAdmin, B2, action)).toBe(true)
     }
@@ -59,7 +59,7 @@ describe('can', () => {
 
 describe('requires2fa', () => {
   it('admin global exige', () => expect(requires2fa(globalAdmin)).toBe(true))
-  it('approver e admin de marca exigem', () => {
+  it('approver e admin de organização exigem', () => {
     expect(requires2fa(member('approver'))).toBe(true)
     expect(requires2fa(member('admin'))).toBe(true)
   })

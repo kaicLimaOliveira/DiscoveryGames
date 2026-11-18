@@ -91,7 +91,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       where: { id: admin.id },
       data: { totpSecretEnc: cipher.encrypt(totpSecret, `user:${admin.id}:totp`) },
     })
-    await prisma.brand.create({ data: { name: 'Marca E2E', slug: 'marca-e2e' } })
+    await prisma.organization.create({ data: { name: 'Organização E2E', slug: 'organizacao-e2e' } })
     await prisma.$disconnect()
 
     // Herdadas pelos workers do Playwright.

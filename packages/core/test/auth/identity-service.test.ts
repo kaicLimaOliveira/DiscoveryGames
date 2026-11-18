@@ -43,9 +43,9 @@ afterAll(() => db?.stop())
 beforeEach(async () => {
   const p = db!.prisma
   await p.auditLog.deleteMany()
-  await p.brandMember.deleteMany()
+  await p.organizationMember.deleteMany()
   await p.user.deleteMany()
-  await p.brand.deleteMany()
+  await p.organization.deleteMany()
   svc = makeService(NOW)
 })
 
@@ -69,8 +69,10 @@ async function makeMember(
   const admin = await makeAdmin(`root-${email}`)
   const { id } = await svc.createUser(admin, { email, name: 'M', password: PASSWORD })
   if (role) {
-    const brand = await db!.prisma.brand.create({ data: { name: email, slug: `b-${email}` } })
-    await svc.setMembership(admin, brand.id, id, role)
+    const organization = await db!.prisma.organization.create({
+      data: { name: email, slug: `b-${email}` },
+    })
+    await svc.setMembership(admin, organization.id, id, role)
   }
   return id
 }
@@ -278,14 +280,14 @@ describe('senha e permissões', () => {
   it('setMembership cria, altera e remove com auditoria; listUsers reflete', async () => {
     const admin = await makeAdmin()
     const { id } = await svc.createUser(admin, { email: 'm@x.com', name: 'M', password: PASSWORD })
-    const brand = await db!.prisma.brand.create({ data: { name: 'B', slug: 'b-m' } })
-    await svc.setMembership(admin, brand.id, id, 'viewer')
-    await svc.setMembership(admin, brand.id, id, 'editor')
+    const organization = await db!.prisma.organization.create({ data: { name: 'B', slug: 'b-m' } })
+    await svc.setMembership(admin, organization.id, id, 'viewer')
+    await svc.setMembership(admin, organization.id, id, 'editor')
     let list = await svc.listUsers(admin)
     const m = list.find((u) => u.id === id)!
-    expect(m.memberships).toEqual([{ brandId: brand.id, role: 'editor' }])
+    expect(m.memberships).toEqual([{ organizationId: organization.id, role: 'editor' }])
     expect(m.totpEnabled).toBe(false)
-    await svc.setMembership(admin, brand.id, id, null)
+    await svc.setMembership(admin, organization.id, id, null)
     list = await svc.listUsers(admin)
     expect(list.find((u) => u.id === id)!.memberships).toEqual([])
     const actions = (await db!.prisma.auditLog.findMany()).map((a) => a.action)
@@ -333,16 +335,16 @@ describe('revogação de sessão ao mudar papel/status', () => {
   it('setMembership incrementa sessionVersion do alvo ao criar, alterar e remover vínculo', async () => {
     const admin = await makeAdmin()
     const { id } = await svc.createUser(admin, { email: 's@x.com', name: 'S', password: PASSWORD })
-    const brand = await db!.prisma.brand.create({ data: { name: 'B', slug: 'b-s' } })
+    const organization = await db!.prisma.organization.create({ data: { name: 'B', slug: 'b-s' } })
     const v0 = await version(id)
-    await svc.setMembership(admin, brand.id, id, 'editor')
+    await svc.setMembership(admin, organization.id, id, 'editor')
     expect(await version(id)).toBe(v0 + 1)
-    await svc.setMembership(admin, brand.id, id, 'approver')
+    await svc.setMembership(admin, organization.id, id, 'approver')
     expect(await version(id)).toBe(v0 + 2)
-    await svc.setMembership(admin, brand.id, id, null)
+    await svc.setMembership(admin, organization.id, id, null)
     expect(await version(id)).toBe(v0 + 3)
     // Remover vínculo inexistente não muda nada.
-    await svc.setMembership(admin, brand.id, id, null)
+    await svc.setMembership(admin, organization.id, id, null)
     expect(await version(id)).toBe(v0 + 3)
     expect(await version(admin.id)).toBe(1)
   })

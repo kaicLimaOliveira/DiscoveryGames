@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   Client,
   PASSWORD,
-  createBrand,
+  createOrganization,
   createUser,
   db,
   loggedIn,
@@ -18,17 +18,17 @@ import { defaults as ironDefaults, seal, unseal } from 'iron-webcrypto'
 
 await setupServer()
 
-let brandId: string
+let organizationId: string
 let editor: TestUser
 let approver: TestUser
 let admin: TestUser
 
 beforeAll(async () => {
-  brandId = (await createBrand()).id
-  editor = await createUser({ prefix: 'editor', memberships: [{ brandId, role: 'editor' }] })
+  organizationId = (await createOrganization()).id
+  editor = await createUser({ prefix: 'editor', memberships: [{ organizationId, role: 'editor' }] })
   approver = await createUser({
     prefix: 'approver',
-    memberships: [{ brandId, role: 'approver' }],
+    memberships: [{ organizationId, role: 'approver' }],
     totp: true,
   })
   admin = await createUser({ prefix: 'admin', role: 'admin', totp: true })
@@ -231,7 +231,7 @@ describe('sessão', () => {
   it('/api/_auth/session: sessão válida devolve o usuário sem secure; revogada devolve {} e limpa o cookie', async () => {
     const user = await createUser({
       prefix: 'auth-utils',
-      memberships: [{ brandId, role: 'editor' }],
+      memberships: [{ organizationId, role: 'editor' }],
     })
     const client = await loggedIn(user)
     const ok = await client.request('/api/_auth/session')
@@ -277,7 +277,10 @@ describe('sessão', () => {
   })
 
   it('troca de senha: a sessão A continua e a sessão B passa a receber 401', async () => {
-    const user = await createUser({ prefix: 'troca', memberships: [{ brandId, role: 'editor' }] })
+    const user = await createUser({
+      prefix: 'troca',
+      memberships: [{ organizationId, role: 'editor' }],
+    })
     const a = await loggedIn(user)
     const b = await loggedIn(user)
     expect((await b.request('/api/admin/users')).status).toBe(403)

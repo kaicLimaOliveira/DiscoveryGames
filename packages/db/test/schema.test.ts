@@ -8,22 +8,37 @@ beforeAll(async () => {
 afterAll(() => db.stop())
 
 it('gera uuid v7 e timestamps', async () => {
-  const b = await db.prisma.brand.create({ data: { name: 'B', slug: 'b' } })
+  const b = await db.prisma.organization.create({ data: { name: 'B', slug: 'b' } })
   expect(b.id[14]).toBe('7')
   expect(b.timezone).toBe('America/Sao_Paulo')
   expect(b.createdAt).toBeInstanceOf(Date)
 })
-it('Setting global é único mesmo com brandId nulo', async () => {
+it('Setting global é único mesmo com organizationId nulo', async () => {
   await db.prisma.setting.create({ data: { key: 'k', value: 1 } })
   await expect(db.prisma.setting.create({ data: { key: 'k', value: 2 } })).rejects.toThrow()
 })
-it('BrandMember tem PK composta', async () => {
+it('OrganizationMember tem PK composta', async () => {
   const u = await db.prisma.user.create({
     data: { email: 'a@x.com', name: 'A', passwordHash: 'h' },
   })
-  const b = await db.prisma.brand.create({ data: { name: 'C', slug: 'c' } })
-  await db.prisma.brandMember.create({ data: { brandId: b.id, userId: u.id, role: 'editor' } })
+  const b = await db.prisma.organization.create({ data: { name: 'C', slug: 'c' } })
+  await db.prisma.organizationMember.create({
+    data: { organizationId: b.id, userId: u.id, role: 'editor' },
+  })
   await expect(
-    db.prisma.brandMember.create({ data: { brandId: b.id, userId: u.id, role: 'viewer' } }),
+    db.prisma.organizationMember.create({
+      data: { organizationId: b.id, userId: u.id, role: 'viewer' },
+    }),
   ).rejects.toThrow()
+})
+it('Organization tem os padrões de configuração', async () => {
+  const o = await db.prisma.organization.create({ data: { name: 'D', slug: 'd' } })
+  expect(o.tags).toEqual([])
+  expect(o.voiceGuide).toBe('')
+  expect(o.fixedHashtags).toEqual([])
+  expect(o.creditTemplate).toBe('Créditos: {creator}')
+  expect(o.captionStyle).toEqual({})
+  expect(o.clipDefaults).toEqual({ targetMin: 5, targetMax: 10, minSec: 30, maxSec: 90 })
+  expect(o.retention).toEqual({ sourceDays: 30, unusedSourceDays: 14, clipDays: 90 })
+  expect(Number(o.aiMonthlyBudgetUsd)).toBe(50)
 })

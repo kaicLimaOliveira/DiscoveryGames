@@ -1,4 +1,4 @@
-import type { BrandRole, GlobalRole } from '@central/db'
+import type { OrganizationRole, GlobalRole } from '@central/db'
 
 export type Action =
   | 'library.read'
@@ -9,7 +9,7 @@ export type Action =
   | 'settings.manage'
   | 'users.manage'
 
-export const ACTION_MIN_ROLE: Record<Action, BrandRole> = {
+export const ACTION_MIN_ROLE: Record<Action, OrganizationRole> = {
   'library.read': 'viewer',
   'content.edit': 'editor',
   'publication.approve': 'approver',
@@ -22,15 +22,15 @@ export const ACTION_MIN_ROLE: Record<Action, BrandRole> = {
 export type Actor = {
   userId: string
   globalRole: GlobalRole
-  memberships: Array<{ brandId: string; role: BrandRole }>
+  memberships: Array<{ organizationId: string; role: OrganizationRole }>
 }
 
-const RANK: Record<BrandRole, number> = { viewer: 0, editor: 1, approver: 2, admin: 3 }
+const RANK: Record<OrganizationRole, number> = { viewer: 0, editor: 1, approver: 2, admin: 3 }
 
-export function can(actor: Actor, brandId: string | null, action: Action): boolean {
+export function can(actor: Actor, organizationId: string | null, action: Action): boolean {
   if (actor.globalRole === 'admin') return true
-  if (brandId === null) return false
-  const m = actor.memberships.find((x) => x.brandId === brandId)
+  if (organizationId === null) return false
+  const m = actor.memberships.find((x) => x.organizationId === organizationId)
   return m !== undefined && RANK[m.role] >= RANK[ACTION_MIN_ROLE[action]]
 }
 
