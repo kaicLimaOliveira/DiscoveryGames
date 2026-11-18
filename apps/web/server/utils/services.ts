@@ -1,7 +1,9 @@
 import {
+  createAccountService,
   createIdentityService,
   createLoginRateLimiter,
   createOrganizationService,
+  type AccountService,
   type IdentityService,
   type OrganizationService,
 } from '@central/core'
@@ -16,6 +18,7 @@ export interface Services {
   db: Db
   identity: IdentityService
   organizations: OrganizationService
+  accounts: AccountService
   storage: Storage
   /** Fila pg-boss (papel `web`, sem migrações), conectada na primeira chamada. */
   queue(): Promise<PgBossQueue>
@@ -33,18 +36,21 @@ export function useServices(): Services {
   const db = createPrisma(config.DATABASE_URL)
   // Um único limitador por processo, compartilhado pelo serviço de identidade.
   const limiter = createLoginRateLimiter()
+  const cipher = createCipher(config.APP_ENCRYPTION_KEYS)
   const identity = createIdentityService({
     db,
-    cipher: createCipher(config.APP_ENCRYPTION_KEYS),
+    cipher,
     limiter,
     totpIssuer: config.TOTP_ISSUER,
   })
   const organizations = createOrganizationService({ db })
+  const accounts = createAccountService({ db, cipher, logger })
   const storage = createStorage(config)
   services = {
     db,
     identity,
     organizations,
+    accounts,
     storage,
     logger,
     queue() {

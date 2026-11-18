@@ -17,6 +17,18 @@ enum UserStatus {
   disabled
 }
 
+enum SocialPlatform {
+  instagram
+  facebook
+  youtube
+  tiktok
+}
+
+enum AccountStatus {
+  active
+  needs_reauth
+}
+
 enum OrganizationRole {
   viewer
   editor
@@ -62,6 +74,7 @@ model Organization {
   members            OrganizationMember[]
   settings           Setting[]
   auditLogs          AuditLog[]
+  socialAccounts     SocialAccount[]
 }
 
 model OrganizationMember {
@@ -111,4 +124,23 @@ model Heartbeat {
   at        DateTime @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model SocialAccount {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @db.Uuid
+  platform       SocialPlatform
+  externalId     String
+  displayName    String
+  status         AccountStatus  @default(active)
+  credentialEnc  String?
+  scopes         String[]       @default([])
+  dailyLimit     Int?
+  connectedById  String?        @db.Uuid
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, externalId])
+  @@index([organizationId])
 }
