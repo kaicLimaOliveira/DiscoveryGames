@@ -5,3 +5,7 @@ packages:
 # undici 8 exige zlib zstd (Node >=22.15); fixado em 7.x para suportar Node 22.14 local
 overrides:
   undici: 7.30.2
+
+# pnpm 10 bloqueia scripts de build; o ffmpeg-static baixa o binário no postinstall
+onlyBuiltDependencies:
+  - ffmpeg-static
