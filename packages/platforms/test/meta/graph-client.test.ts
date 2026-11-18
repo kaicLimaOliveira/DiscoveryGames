@@ -102,6 +102,20 @@ describe('createMetaGraphClient.discoverPages', () => {
     expect(urls).toHaveLength(1)
   })
 
+  it('paging.next malformado ou relativo vira TransientError com mensagem fixa', async () => {
+    for (const next of ['/relativo?access_token=SEGREDO', 'http://']) {
+      const { fetchFn } = fakeFetch([
+        jsonResponse({ data: [{ id: '1', name: 'A', access_token: 'a' }], paging: { next } }),
+      ])
+      const err = await client(fetchFn)
+        .discoverPages(TOKEN)
+        .catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(TransientError)
+      expect((err as Error).message).toBe('A Meta não respondeu. Tente de novo.')
+      expect((err as Error).cause).toBeUndefined()
+    }
+  })
+
   it('erro 190 vira PermanentError com mensagem de token', async () => {
     const { fetchFn } = fakeFetch([
       jsonResponse({ error: { code: 190, type: 'OAuthException', message: 'expired' } }, 400),

@@ -43,11 +43,13 @@ describe('webEnvSchema', () => {
       expect(() => load({ ...meta, META_GRAPH_VERSION: '21' })).toThrow()
       expect(() => load({ ...meta, META_GRAPH_VERSION: 'v21' })).toThrow()
     })
-    it('META_GRAPH_BASE_URL vale fora de produção e é ignorada com NODE_ENV=production', () => {
+    it('META_GRAPH_BASE_URL só vale com NODE_ENV=test (fail-closed)', () => {
       const url = 'http://127.0.0.1:9999'
-      expect(metaConfig(load({ ...meta, META_GRAPH_BASE_URL: url }))?.baseUrl).toBe(url)
-      const prod = load({ ...meta, META_GRAPH_BASE_URL: url, NODE_ENV: 'production' })
-      expect(metaConfig(prod)?.baseUrl).toBeUndefined()
+      const withEnv = (NODE_ENV: string) =>
+        metaConfig(load({ ...meta, META_GRAPH_BASE_URL: url, NODE_ENV }))?.baseUrl
+      expect(withEnv('test')).toBe(url)
+      expect(withEnv('production')).toBeUndefined()
+      expect(withEnv('development')).toBeUndefined()
     })
   })
 })

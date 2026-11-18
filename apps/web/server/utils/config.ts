@@ -33,7 +33,7 @@ export const webEnvSchema = baseEnvSchema
         .regex(/^v\d+\.\d+$/)
         .optional(),
     ),
-    // SÓ PARA TESTES: host alternativo da Graph API. Ignorada com NODE_ENV=production.
+    // SÓ PARA TESTES: host alternativo da Graph API. Só vale com NODE_ENV=test.
     META_GRAPH_BASE_URL: z.preprocess(emptyAsUnset, z.url().optional()),
   })
 
@@ -52,7 +52,7 @@ export function metaConfig(config: WebConfig): MetaConfig | null {
   return {
     appSecret: META_APP_SECRET,
     graphVersion: META_GRAPH_VERSION,
-    baseUrl: config.NODE_ENV === 'production' ? undefined : config.META_GRAPH_BASE_URL,
+    baseUrl: config.NODE_ENV === 'test' ? config.META_GRAPH_BASE_URL : undefined,
   }
 }
 

@@ -45,6 +45,15 @@ interface RawResponse {
   error?: { code?: number; type?: string }
 }
 
+/** Origem da URL; malformada vira erro fixo (o TypeError do `URL` pode ecoar a URL com o token). */
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin
+  } catch {
+    throw new TransientError(META_UNAVAILABLE)
+  }
+}
+
 export function metaAppSecretProof(token: string, appSecret: string): string {
   return createHmac('sha256', appSecret).update(token).digest('hex')
 }
@@ -106,7 +115,7 @@ export function createMetaGraphClient(opts: MetaGraphClientOptions): MetaGraphCl
         }
         url = body.paging?.next
         // O token vai na URL de `paging.next`: nunca seguir para outro host.
-        if (url && new URL(url).origin !== origin) throw new TransientError(META_UNAVAILABLE)
+        if (url && originOf(url) !== origin) throw new TransientError(META_UNAVAILABLE)
       }
       if (pages.length === 0) throw new PermanentError(META_NO_PAGES)
       return pages
