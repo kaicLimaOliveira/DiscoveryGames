@@ -159,6 +159,18 @@ describe('source-service: upload', () => {
     expect(await db!.prisma.source.count()).toBe(0)
   })
 
+  it('createUpload aceita duração mínima de 3 s e recusa 2 s', async () => {
+    const ok = await svc.createUpload(
+      editorA,
+      orgA,
+      uploadInput({ params: { minSec: 3, maxSec: 30 } }),
+    )
+    expect(ok.source.id).toBeTruthy()
+    await expect(
+      svc.createUpload(editorA, orgA, uploadInput({ params: { minSec: 2, maxSec: 30 } })),
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+
   it('createUpload exige content.edit', async () => {
     await expect(svc.createUpload(viewerA, orgA, uploadInput())).rejects.toBeInstanceOf(
       ForbiddenError,

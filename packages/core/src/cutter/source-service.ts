@@ -189,8 +189,8 @@ function validParams(p: SourceParams): SourceParams {
   if (!(targetMin >= 1 && targetMin <= targetMax && targetMax <= 20)) {
     throw new ValidationError('Quantidade de cortes inválida: use 1 ≤ mínimo ≤ máximo ≤ 20.')
   }
-  if (!(minSec >= 15 && minSec < maxSec && maxSec <= 180)) {
-    throw new ValidationError('Duração dos cortes inválida: use 15 ≤ mínimo < máximo ≤ 180 s.')
+  if (!(minSec >= 3 && minSec < maxSec && maxSec <= 180)) {
+    throw new ValidationError('Duração dos cortes inválida: use 3 ≤ mínimo < máximo ≤ 180 s.')
   }
   let canonical: string | undefined
   try {
