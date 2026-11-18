@@ -95,6 +95,13 @@ services:
       S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       S3_FORCE_PATH_STYLE: 'true'
+      # Integrações opcionais: chave sem valor repassa só o que existir no ambiente (nada de string
+      # vazia). Sem elas o painel responde 503 "Integração não configurada" nessas telas.
+      META_APP_ID:
+      META_APP_SECRET:
+      META_GRAPH_VERSION:
+      GOOGLE_OAUTH_CLIENT_ID:
+      GOOGLE_OAUTH_CLIENT_SECRET:
     healthcheck:
       # Basta o processo responder (o /api/health devolve 503 se o storage/worker estiverem fora).
       test:

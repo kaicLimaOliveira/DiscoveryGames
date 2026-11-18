@@ -47,11 +47,15 @@ Copiar `.env.example` para `/opt/central/.env` e `chmod 600`. Os valores do exem
 | `TRUST_PROXY` | `true` (atrás do Caddy) |
 | `TOTP_ISSUER`, `LOG_LEVEL` | opcionais |
 | `SENTRY_DSN` | opcional; na Fase 1 só o **worker** inicializa o Sentry (o web ignora) |
+| `META_APP_ID`, `META_APP_SECRET`, `META_GRAPH_VERSION` | **opcionais**, mas as três juntas: sem qualquer uma, a conexão Meta responde 503 "Integração não configurada" e o resto do painel funciona. `META_GRAPH_VERSION` (formato `vNN.N`) não tem valor padrão. Passo a passo: [meta-app.md](meta-app.md) |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | **opcionais**, mas as duas juntas, senão a conexão do YouTube responde 503. O redirect cadastrado no Google é `${APP_ORIGIN}/api/oauth/youtube/callback`. Passo a passo: [google-oauth.md](google-oauth.md) |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | dados do bucket R2 |
 | `IMAGE_OWNER` | owner do GitHub **em minúsculas** (mesmo usado no `images.yml`) |
 | `IMAGE_TAG` | tag a implantar: `sha-<curto>` ou a versão (`1.2.3`). Evitar `latest`/`edge` em produção |
 
 As variáveis `MINIO_*` valem só para o compose de desenvolvimento.
+
+As variáveis `META_*` e `GOOGLE_OAUTH_*` podem ficar ausentes ou vazias (vazio equivale a não definido); o compose só as repassa ao `web` quando existem. Depois de alterá-las, recrie o web: `docker compose -f compose.prod.yaml --env-file .env up -d web`.
 
 **Guarda das chaves:** `APP_ENCRYPTION_KEYS` e as demais credenciais ficam em um gerenciador de senhas compartilhado entre **2 pessoas**. Perder `APP_ENCRYPTION_KEYS` torna os segredos cifrados no banco irrecuperáveis. Na rotação, acrescentar a nova versão (`2:...`) mantendo as anteriores na lista.
 
@@ -78,7 +82,7 @@ docker compose -f compose.prod.yaml --env-file .env exec worker node dist/bootst
   --email <e-mail> --name "<nome>" --org-name "<organização>" --org-slug <slug>
 ```
 
-O CLI imprime a senha temporária. No primeiro login, trocar a senha e configurar o 2FA (TOTP).
+`--org-name` e `--org-slug` criam a primeira organização (o admin entra nela como administrador). O CLI imprime a senha temporária. No primeiro login, trocar a senha e configurar o 2FA (TOTP). Depois, conectar as contas de cada organização em **Contas** ([meta-app.md](meta-app.md) e [google-oauth.md](google-oauth.md)).
 
 ## 7. Verificação
 

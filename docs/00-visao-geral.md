@@ -1,7 +1,7 @@
 # 00 — Visão geral do produto
 
 > Documento de planejamento. Nenhum código de implementação foi escrito nesta etapa.
-> Data de referência: 2026-11-15.
+> Data de referência: 2026-11-15. Atualizado em 2026-11-18 com o escopo v2 (organizações e cortador, [spec](superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md)).
 
 ## 1. O que é
 
@@ -24,9 +24,9 @@ Princípio central: **produzir uma vez, distribuir com adaptação inteligente �
 |---|---|
 | Dono/gestor da página | Aprova, agenda, acompanha resultados, configura contas |
 | Editor/produtor | Sobe vídeos, preenche contexto, revisa textos |
-| (Futuro) outras páginas/canais do mesmo dono | Cada página = uma **Marca** com suas próprias contas conectadas |
+| Outras páginas/canais do mesmo dono | Cada página = uma **Organização** (antes "Marca") com suas próprias contas conectadas e seus próprios membros |
 
-**Escopo de negócio decidido:** uso **interno**. Não é SaaS, não há clientes externos, não há cobrança nem isolamento entre inquilinos. O modelo de dados, porém, já separa tudo por **Marca** (`Brand`) para administrar várias páginas no futuro sem reconstrução.
+**Escopo de negócio decidido:** uso **interno**. Não é SaaS, não há clientes externos e não há cobrança. A partir do escopo v2 o painel é **multi-organização**: o dono administra várias páginas de nicho (por exemplo games e academia) no mesmo painel, cada uma uma **Organização** (`Organization`) com contas vinculadas, membros e papéis próprios, e uma organização não vê nada de outra ([ADR 0009](adr/0009-organizacoes-e-contas.md)).
 
 ## 3. Plataformas no escopo
 
@@ -42,6 +42,9 @@ Detalhes, limitações e requisitos de aprovação de cada API: [`07-integracoes
 ## 4. Objetivos
 
 - **Objetivo de negócio (decidido em 2026-11-15): monetizar a página nas quatro redes.** Toda decisão de produto deve preservar a elegibilidade aos programas de monetização (originalidade, conta pessoal no TikTok, duração 61–90 s, música sem reivindicação). Ver [20 — Monetização](20-monetizacao.md).
+- **Multi-organização:** várias organizações, cada uma com suas contas de Instagram, Facebook, YouTube e @ do TikTok, filtradas pela organização ativa e verificadas no servidor ([ADR 0009](adr/0009-organizacoes-e-contas.md)).
+- **Cortador de vídeos** (escopo v2): receber um vídeo longo (MP4 ou link do YouTube), a IA sugere os melhores trechos e a central gera cortes verticais para revisão, aprovação e publicação ([ADR 0008](adr/0008-cortador-hibrido.md)).
+- **Trava de direitos:** toda fonte de vídeo tem uma declaração de direitos obrigatória; fonte sem direitos (`none`) nunca vai para publicação nem para download ([ADR 0010](adr/0010-trava-de-direitos.md)).
 - Reduzir o trabalho manual de publicar o mesmo vídeo em 4 redes a **um envio + uma revisão**.
 - **Piloto automático:** o dono define uma grade (de quanto em quanto tempo postar em cada rede) e a central pega o próximo conteúdo aprovado da fila e publica sozinha ([11 §7](11-agendamento.md), ADR 0007). A aprovação humana continua obrigatória, mas é feita com um clique e pode ser em lote.
 - Textos nativos de cada rede, sem inventar fatos sobre jogos.
@@ -51,15 +54,18 @@ Detalhes, limitações e requisitos de aprovação de cada API: [`07-integracoes
 
 ## 5. Não-objetivos (fora do escopo, deliberadamente)
 
-- Edição de vídeo criativa (cortes, efeitos, legendas queimadas). A central adapta tecnicamente; não edita.
+- Edição de vídeo manual ou criativa dentro da central (efeitos, timeline), além de escolher e ajustar o início e o fim de um corte. A central corta, reenquadra e adapta tecnicamente.
+- Modo orgânico (agente de notícias e posts de feed): débito técnico D1 em [21](21-debitos-tecnicos.md).
 - Republicação de conteúdo de terceiros, "reposts" em massa, contas múltiplas para a mesma audiência.
 - Automação de navegador (Selenium/Puppeteer) para publicar quando existe API oficial.
 - Respostas automáticas a comentários/DMs (pode entrar num roadmap futuro, fora deste plano).
-- Multi-inquilino SaaS (fora; ver [riscos](16-riscos-e-limitacoes.md) para o que mudaria).
+- Multi-inquilino SaaS com clientes externos e cobrança (fora; ver [riscos](16-riscos-e-limitacoes.md) para o que mudaria). As organizações são do mesmo dono.
 
 ## 6. Anti-objetivos (o que tornaria o projeto um fracasso mesmo "funcionando")
 
 - Publicar algo **sem aprovação humana**.
+- **Publicar cortes de fontes sem direitos registrados** (trava de direitos obrigatória).
+- Uma organização ver ou publicar nas contas de outra.
 - Publicar em duplicidade na mesma conta.
 - A IA afirmar fatos falsos (datas de lançamento, notas, rumores como verdade).
 - Contas penalizadas por conteúdo reutilizado, marca d'água de outra rede ou música não licenciada.
@@ -79,6 +85,9 @@ Detalhes, limitações e requisitos de aprovação de cada API: [`07-integracoes
 | Publicação | Adaptadores por plataforma atrás de uma interface comum; idempotência por publicação. IG + FB com um único System User do Business Manager; YouTube via OAuth; **TikTok em modo manual assistido** | [07](07-integracoes/00-estrategia-e-abstracao.md) |
 | Facebook > 90 s | Reels via API só aceitam 3–90 s → vídeos mais longos **não** vão para o Facebook (bloqueio com aviso) | [07](07-integracoes/00-estrategia-e-abstracao.md) |
 | Automação da postagem | Grade recorrente por rede + fila de conteúdos aprovados + alocador automático; nunca repost quando a fila esvazia | [11 §7](11-agendamento.md), [ADR 0007](adr/0007-grade-recorrente-e-fila.md) |
+| Organizações | `Brand` virou `Organization`; contas vinculadas por organização, uma conexão Meta por organização | [ADR 0009](adr/0009-organizacoes-e-contas.md) |
+| Cortador | Híbrido: transcrição por API, Claude escolhe os trechos, FFmpeg corta e reenquadra | [ADR 0008](adr/0008-cortador-hibrido.md) |
+| Direitos | Declaração obrigatória por fonte; `none` nunca publica nem baixa | [ADR 0010](adr/0010-trava-de-direitos.md) |
 | Hospedagem | 1 VPS com Docker Compose | [04](04-tecnologias.md), [15](15-custos.md) |
 
 ## 8. Mapa da documentação

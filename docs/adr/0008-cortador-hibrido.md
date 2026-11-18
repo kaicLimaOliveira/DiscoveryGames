@@ -1,0 +1,15 @@
+# ADR 0008 — Cortador de vídeos híbrido (transcrição por API, Claude escolhe, FFmpeg corta)
+
+- **Status:** aceito (2026-11-17)
+- **Contexto:** o dono quer um cortador no estilo WayinVideo: recebe um vídeo longo (MP4 ou link do YouTube), encontra os melhores trechos e gera cortes verticais para publicar nas contas de cada organização. O conteúdo não é específico (treino, gameplay), então o motor precisa ser genérico. A Fase 1 já tem worker, fila no Postgres, storage S3 e o adaptador de plataformas, e a infraestrutura é uma VPS só (4 vCPU, 8 GB). Spec: [§3, §5 e §8](../superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md).
+- **Decisão:** abordagem **híbrida**. O worker existente orquestra: uma API de transcrição com timestamps por palavra (Groq Whisper atrás de uma interface `Transcriber`, com fallback), sinais técnicos do FFmpeg (volume, cortes de cena, movimento) e amostragem de quadros; o **Claude** recebe transcrição, sinais, quadros e o contexto da organização e devolve candidatos com início, fim, nota de gancho, motivo, título, legenda por rede, hashtags e layout; o **FFmpeg** corta e reenquadra com layouts simples (rosto, centro, jogo + facecam, vídeo inteiro com fundo desfocado). O original nunca é alterado. **MP4 é o caminho garantido**; o link do YouTube é conveniência que "pode falhar" (os termos do YouTube proíbem ferramenta não oficial de download e IPs de datacenter costumam ser bloqueados). Toda análise passa pelo `CostLedger` e pelo orçamento mensal da organização.
+- **Alternativas:**
+  1. **Motor próprio completo**, com detecção, rastreamento e reenquadramento feitos por nós: controle total e custo baixo por corte, mas meses até uma qualidade comparável, principalmente no rastreamento em gameplay. Descartada.
+  2. **API de cortes de terceiros** (por exemplo Vizard ou Klap; preço e termos a confirmar): rápida e de qualidade alta, mas cobra por minuto, cria dependência de fornecedor e dá pouco controle. **Plano B** se a qualidade do híbrido não bastar.
+- **Consequências:**
+  - Custo baixo, sem fornecedor de cortes, reaproveitando a Fase 1; a qualidade melhora por etapas.
+  - A qualidade em gameplay sem fala depende dos sinais técnicos e dos layouts escolhíveis (risco 2 da spec §10).
+  - Vídeos longos pesam na CPU da VPS: limites de 2 h e 4 GB e concorrência 1 (risco 4); se preciso, um worker de mídia dedicado.
+  - Ficam para quem constrói: biblioteca de detecção de rosto, limiares dos sinais, formato do prompt.
+  - A abordagem 2 continua possível, porque o motor fica atrás de interfaces.
+  - **Nada do cortador existe ainda no código**: a Fase 2 trata só de organizações e contas.

@@ -39,8 +39,12 @@
 | — | Painel administrativo (telas) | [19-painel-administrativo.md](19-painel-administrativo.md) |
 | — | Monetização (programas, requisitos, impacto no projeto) | [20-monetizacao.md](20-monetizacao.md) |
 | — | Deploy na VPS (runbook) | [runbooks/deploy.md](runbooks/deploy.md) |
+| — | App Meta: System User, token e teste de Live (runbook do dono) | [runbooks/meta-app.md](runbooks/meta-app.md) |
+| — | Google OAuth e YouTube (runbook do dono) | [runbooks/google-oauth.md](runbooks/google-oauth.md) |
+| — | Escopo v2: organizações e cortador (design) | [superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md](superpowers/specs/2026-11-17-organizacoes-e-cortador-design.md) |
+| — | Débitos técnicos e ideias adiadas | [21-debitos-tecnicos.md](21-debitos-tecnicos.md) |
 | — | Planos de implementação | [superpowers/plans/](superpowers/plans/) |
-| — | Decisões (ADRs) | [adr/](adr/) |
+| — | Decisões (ADRs; 0008 cortador híbrido, 0009 organizações e contas, 0010 trava de direitos) | [adr/](adr/) |
 | — | Fontes de preços | [_pesquisa/custos-infra-fontes.md](_pesquisa/custos-infra-fontes.md) |
 | — | Fontes de monetização | [_pesquisa/monetizacao-fontes.md](_pesquisa/monetizacao-fontes.md) |
 
@@ -54,7 +58,9 @@
 
 | Termo | Significado |
 |---|---|
-| Marca (`Brand`) | Uma página/canal gamer com suas contas sociais. Hoje há uma; o modelo suporta várias |
+| Organização (`Organization`, antes `Brand`) | Uma página/canal de nicho com suas contas sociais, membros e configurações. O painel suporta várias |
+| Fonte (`Source`) | O vídeo longo que o cortador analisa, com declaração de direitos obrigatória |
+| Corte (`Clip`) | Trecho renderizado de uma fonte; vira uma publicação por rede |
 | Conteúdo (`Content`) | Um vídeo original e seus metadados |
 | Rendition | Versão derivada do original para uma plataforma/formato |
 | Publicação (`Publication`) | Um conteúdo em uma conta social em um formato — unidade de aprovação, agendamento e publicação |

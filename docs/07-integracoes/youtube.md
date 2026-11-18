@@ -73,6 +73,20 @@ Fonte: [OAuth 2.0 Scopes](https://developers.google.com/identity/protocols/oauth
 - ❓ **Caminho provável para uso interno**: app External em **"In production"** sem verificação, apoiado na exceção de uso pessoal (< 100 usuários), com o dono aceitando a tela de "app não verificado". A hipótese é que assim o refresh token não expire em 7 dias, já que a regra de 7 dias cita só "Testing". **Validar na prática** antes de fechar a arquitetura.
 - ❓ Alternativa **Internal**: só funciona se a conta Google dona do canal (ou a Brand Account) pertencer a uma organização Google Workspace. Validar como o canal do cliente está vinculado.
 
+### 3.5 Endpoints OAuth usados pela Central (adicionado na Fase 2)
+
+Releitura de [Server-side web apps](https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps) em 2026-11-18 para esta tabela. A marca ✅ vale só para o que esse guia (ou página já citada neste documento) diz; o resto fica ❓.
+
+| Item | Uso na Central | Status | Fonte |
+|---|---|---|---|
+| `https://accounts.google.com/o/oauth2/v2/auth` | Tela de autorização (parâmetros `access_type=offline`, `prompt=consent`, `scope`, `state`) | ✅ o guia diz "Google's OAuth 2.0 endpoint is at ..." | [Server-side web apps](https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps) |
+| `https://oauth2.googleapis.com/token` | Troca do `code` por tokens e renovação com o refresh token | ✅ o guia manda chamar esse endpoint | [Server-side web apps](https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps) |
+| `https://oauth2.googleapis.com/revoke` | Revogar a concessão ao desconectar o canal | ✅ aparece nos exemplos de código do guia (`requests.post('https://oauth2.googleapis.com/revoke', ...)`); a prosa do guia não o descreve | [Server-side web apps](https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps) |
+| PKCE (`code_challenge`, `code_challenge_method=S256`) | Reforço do fluxo, além do `state` | ❓ o guia **não menciona** PKCE nem `S256`. A Central o envia como defesa extra; validar na prática que o Google aceita e ignora/usa o parâmetro para cliente Web | nenhuma página citada aqui cobre |
+| `GET https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true` | Descobrir o canal (id e título) autorizado | ❓ o guia **não** traz `channels.list`. Esta página já confirma só que `channels.list` custa 1 unidade ([Quota calculator](https://developers.google.com/youtube/v3/determine_quota_cost)) e que `youtube.readonly` serve a `channels.list` (tabela 3.2). O uso de `mine=true` com `part=snippet` precisa ser conferido na [referência de `channels.list`](https://developers.google.com/youtube/v3/docs/channels/list), ainda não lida | ❓ |
+
+Escopos pedidos pela Central: `https://www.googleapis.com/auth/youtube.upload` e `https://www.googleapis.com/auth/youtube.readonly` (tabela 3.2). O redirect URI cadastrado no Google é `https://<PANEL_DOMAIN>/api/oauth/youtube/callback`.
+
 ---
 
 ## 4. Auditoria / compliance
