@@ -1,6 +1,6 @@
 import { loadConfig } from '@central/shared'
 import { describe, expect, it } from 'vitest'
-import { metaConfig, webEnvSchema } from '../server/utils/config'
+import { googleConfig, metaConfig, webEnvSchema } from '../server/utils/config'
 
 const base = {
   DATABASE_URL: 'postgres://u:p@h:5432/d',
@@ -50,6 +50,37 @@ describe('webEnvSchema', () => {
       expect(withEnv('test')).toBe(url)
       expect(withEnv('production')).toBeUndefined()
       expect(withEnv('development')).toBeUndefined()
+    })
+  })
+
+  describe('googleConfig', () => {
+    const google = { GOOGLE_OAUTH_CLIENT_ID: 'cid', GOOGLE_OAUTH_CLIENT_SECRET: 'csecret' }
+    const load = (extra: Record<string, string>) => loadConfig(webEnvSchema, { ...base, ...extra })
+
+    it('só vale com client id e secret (vazios contam como ausentes)', () => {
+      expect(googleConfig(load({}))).toBeNull()
+      expect(googleConfig(load({ ...google, GOOGLE_OAUTH_CLIENT_SECRET: '' }))).toBeNull()
+      const cfg = googleConfig(load(google))
+      expect(cfg).toEqual({
+        clientId: 'cid',
+        clientSecret: 'csecret',
+        redirectUri: `${load({}).APP_ORIGIN}/api/oauth/youtube/callback`,
+        oauthBaseUrl: undefined,
+        apiBaseUrl: undefined,
+      })
+    })
+    it('as URLs base só valem com NODE_ENV=test (fail-closed)', () => {
+      const urls = {
+        GOOGLE_OAUTH_BASE_URL: 'http://127.0.0.1:9998',
+        YOUTUBE_API_BASE_URL: 'http://127.0.0.1:9999',
+      }
+      const withEnv = (NODE_ENV: string) => googleConfig(load({ ...google, ...urls, NODE_ENV }))
+      expect(withEnv('test')?.oauthBaseUrl).toBe(urls.GOOGLE_OAUTH_BASE_URL)
+      expect(withEnv('test')?.apiBaseUrl).toBe(urls.YOUTUBE_API_BASE_URL)
+      for (const env of ['production', 'development']) {
+        expect(withEnv(env)?.oauthBaseUrl).toBeUndefined()
+        expect(withEnv(env)?.apiBaseUrl).toBeUndefined()
+      }
     })
   })
 })

@@ -9,9 +9,14 @@ import {
 } from '@central/core'
 import { createPgBossQueue, createPrisma, type Db, type PgBossQueue } from '@central/db'
 import { createCipher, createLogger } from '@central/shared'
-import { createMetaGraphClient, type MetaGraphClient } from '@central/platforms'
+import {
+  createGoogleOAuth,
+  createMetaGraphClient,
+  type GoogleOAuth,
+  type MetaGraphClient,
+} from '@central/platforms'
 import { createStorage, type Storage } from '@central/storage'
-import { metaConfig, useWebConfig } from './config'
+import { googleConfig, metaConfig, useWebConfig } from './config'
 
 export type Logger = ReturnType<typeof createLogger>
 
@@ -23,6 +28,8 @@ export interface Services {
   storage: Storage
   /** Cliente da Graph API; `null` quando a integração Meta não está configurada. */
   metaGraph: MetaGraphClient | null
+  /** OAuth do Google/YouTube; `null` quando não está configurado. */
+  google: GoogleOAuth | null
   /** Fila pg-boss (papel `web`, sem migrações), conectada na primeira chamada. */
   queue(): Promise<PgBossQueue>
   logger: Logger
@@ -50,6 +57,7 @@ export function useServices(): Services {
   const accounts = createAccountService({ db, cipher, logger })
   const storage = createStorage(config)
   const meta = metaConfig(config)
+  const google = googleConfig(config)
   services = {
     db,
     identity,
@@ -57,6 +65,7 @@ export function useServices(): Services {
     accounts,
     storage,
     metaGraph: meta ? createMetaGraphClient(meta) : null,
+    google: google ? createGoogleOAuth(google) : null,
     logger,
     queue() {
       queuePromise ??= createPgBossQueue({

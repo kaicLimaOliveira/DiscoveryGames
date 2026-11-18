@@ -1,8 +1,8 @@
-import { can, NotFoundError, ValidationError, type Actor } from '@central/core'
+import { ValidationError, type Actor } from '@central/core'
 import type { MetaGraphClient, MetaPage } from '@central/platforms'
 import { PermanentError, TransientError } from '@central/shared'
 import type { H3Event } from 'h3'
-import { requireActor } from './auth'
+import { requireAccountsManage } from './accounts-auth'
 import { useServices } from './services'
 
 /**
@@ -14,17 +14,8 @@ export async function requireMetaManage(
   event: H3Event,
   orgId: string,
 ): Promise<{ actor: Actor; graph: MetaGraphClient }> {
-  const actor = await requireActor(event)
-  const { db, metaGraph } = useServices()
-  const visible =
-    actor.globalRole === 'admin' || actor.memberships.some((m) => m.organizationId === orgId)
-  const org = visible
-    ? await db.organization.findUnique({ where: { id: orgId }, select: { id: true } })
-    : null
-  if (!org) throw new NotFoundError('Organização não encontrada.')
-  if (!can(actor, orgId, 'accounts.manage')) {
-    throw createError({ statusCode: 403, message: 'Você não tem permissão para esta ação.' })
-  }
+  const actor = await requireAccountsManage(event, orgId)
+  const { metaGraph } = useServices()
   if (!metaGraph) {
     throw createError({ statusCode: 503, message: 'Integração com a Meta não configurada.' })
   }

@@ -35,6 +35,12 @@ export const webEnvSchema = baseEnvSchema
     ),
     // SÓ PARA TESTES: host alternativo da Graph API. Só vale com NODE_ENV=test.
     META_GRAPH_BASE_URL: z.preprocess(emptyAsUnset, z.url().optional()),
+    // Google/YouTube: a integração só vale com as duas credenciais definidas.
+    GOOGLE_OAUTH_CLIENT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // SÓ PARA TESTES: hosts alternativos do Google. Só valem com NODE_ENV=test.
+    GOOGLE_OAUTH_BASE_URL: z.preprocess(emptyAsUnset, z.url().optional()),
+    YOUTUBE_API_BASE_URL: z.preprocess(emptyAsUnset, z.url().optional()),
   })
 
 export type WebConfig = z.infer<typeof webEnvSchema>
@@ -53,6 +59,28 @@ export function metaConfig(config: WebConfig): MetaConfig | null {
     appSecret: META_APP_SECRET,
     graphVersion: META_GRAPH_VERSION,
     baseUrl: config.NODE_ENV === 'test' ? config.META_GRAPH_BASE_URL : undefined,
+  }
+}
+
+export interface GoogleConfig {
+  clientId: string
+  clientSecret: string
+  redirectUri: string
+  oauthBaseUrl?: string
+  apiBaseUrl?: string
+}
+
+/** Configuração do Google, ou `null` se faltar o client id ou o secret. */
+export function googleConfig(config: WebConfig): GoogleConfig | null {
+  const { GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET } = config
+  if (!GOOGLE_OAUTH_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) return null
+  const isTest = config.NODE_ENV === 'test'
+  return {
+    clientId: GOOGLE_OAUTH_CLIENT_ID,
+    clientSecret: GOOGLE_OAUTH_CLIENT_SECRET,
+    redirectUri: `${config.APP_ORIGIN}/api/oauth/youtube/callback`,
+    oauthBaseUrl: isTest ? config.GOOGLE_OAUTH_BASE_URL : undefined,
+    apiBaseUrl: isTest ? config.YOUTUBE_API_BASE_URL : undefined,
   }
 }
 

@@ -144,3 +144,15 @@ model SocialAccount {
   @@unique([platform, externalId])
   @@index([organizationId])
 }
+
+model OAuthState {
+  id             String   @id
+  provider       String
+  organizationId String   @db.Uuid
+  userId         String   @db.Uuid
+  codeVerifier   String
+  expiresAt      DateTime @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([expiresAt])
+}
