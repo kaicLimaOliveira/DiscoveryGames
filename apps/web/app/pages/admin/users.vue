@@ -32,7 +32,10 @@ const { data: orgsData } = await useFetch<{ organizations: Organization[] }>('/a
 const users = computed(() => usersData.value?.users ?? [])
 const orgs = computed(() => orgsData.value?.organizations ?? [])
 
-const selectedOrganizationId = ref(orgs.value[0]?.id ?? '')
+const { activeOrgId } = useOrgs()
+const selectedOrganizationId = ref(
+  orgs.value.find((o) => o.id === activeOrgId.value)?.id ?? orgs.value[0]?.id ?? '',
+)
 const error = ref('')
 const notice = ref('')
 

@@ -240,7 +240,10 @@ describe('conexão YouTube', () => {
 
   it('erro inesperado (500) no callback também redireciona sem ecoar', async () => {
     // NUL no state faz o Postgres rejeitar a consulta: erro não tratado dentro da rota.
-    const res = await callback(clients.adminA, { code: 'CODE_SEGREDO', state: 'a SEGREDO_STATE' })
+    const res = await callback(clients.adminA, {
+      code: 'CODE_SEGREDO',
+      state: 'a\u0000SEGREDO_STATE',
+    })
     expect(res.status).toBe(302)
     expect(location(res).startsWith('/orgs?error=')).toBe(true)
     expect(location(res)).not.toContain('SEGREDO')

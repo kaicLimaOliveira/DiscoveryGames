@@ -4,6 +4,7 @@ export interface Me {
   email: string
   stage: 'full' | 'totp_pending' | 'totp_enroll'
   isAdmin: boolean
+  memberships: Array<{ organizationId: string; role: 'viewer' | 'editor' | 'approver' | 'admin' }>
 }
 
 /** Usuário da sessão (servidor é a autoridade); atualizado pelo middleware `auth.global`. */

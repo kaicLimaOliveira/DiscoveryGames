@@ -342,6 +342,7 @@ describe('GET /api/auth/me', () => {
       email: editor.email,
       stage: 'full',
       isAdmin: false,
+      memberships: [{ organizationId, role: 'editor' }],
     })
   })
 

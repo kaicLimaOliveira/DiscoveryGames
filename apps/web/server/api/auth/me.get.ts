@@ -14,5 +14,7 @@ export default defineApiHandler(async (event) => {
     email: user.email,
     stage: user.stage,
     isAdmin: actor.globalRole === 'admin',
+    // Só para a UI esconder ações; a autorização real continua no servidor.
+    memberships: actor.memberships.map((m) => ({ organizationId: m.organizationId, role: m.role })),
   }
 })

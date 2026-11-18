@@ -46,8 +46,8 @@ test('fluxo completo: admin, editor sem 2FA e approver com cadastro de 2FA', asy
   await expect(page).toHaveURL(/\/2fa$/)
   await page.getByLabel('Código de 6 dígitos').fill(code(adminSecret))
   await page.getByRole('button', { name: 'Verificar' }).click()
-  await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByText('Fase 1 — fundação pronta')).toBeVisible()
+  await expect(page).toHaveURL(/\/orgs\/[0-9a-f-]+\/accounts$/)
+  await expect(page.getByRole('heading', { name: 'Contas' })).toBeVisible()
 
   // 2. Admin cria editor e approver.
   await page.goto('/admin/users')
@@ -59,10 +59,12 @@ test('fluxo completo: admin, editor sem 2FA e approver com cadastro de 2FA', asy
   const editorCtx = await browser.newContext()
   const editorPage = await editorCtx.newPage()
   await login(editorPage, 'editor@x.com', PASSWORD)
-  await expect(editorPage).toHaveURL(/\/$/)
-  await expect(editorPage.getByText('Fase 1 — fundação pronta')).toBeVisible()
+  await expect(editorPage).toHaveURL(/\/orgs\/[0-9a-f-]+\/accounts$/)
+  await expect(editorPage.getByRole('heading', { name: 'Contas' })).toBeVisible()
+  // Editor vê as contas em modo leitura, sem as ações de vincular.
+  await expect(editorPage.getByRole('button', { name: 'TikTok (@)' })).toHaveCount(0)
   await editorPage.goto('/admin/users')
-  await expect(editorPage).toHaveURL(/\/$/)
+  await expect(editorPage).toHaveURL(/\/orgs\/[0-9a-f-]+\/accounts$/)
   await editorCtx.close()
 
   // 4. Approver: cadastro obrigatório de 2FA.
@@ -77,7 +79,7 @@ test('fluxo completo: admin, editor sem 2FA e approver com cadastro de 2FA', asy
   const secret = (await secretEl.innerText()).replace(/\s+/g, '')
   await approverPage.getByLabel('Código de 6 dígitos').fill(code(secret))
   await approverPage.getByRole('button', { name: 'Confirmar' }).click()
-  await expect(approverPage).toHaveURL(/\/$/)
-  await expect(approverPage.getByText('Fase 1 — fundação pronta')).toBeVisible()
+  await expect(approverPage).toHaveURL(/\/orgs\/[0-9a-f-]+\/accounts$/)
+  await expect(approverPage.getByRole('heading', { name: 'Contas' })).toBeVisible()
   await approverCtx.close()
 })
