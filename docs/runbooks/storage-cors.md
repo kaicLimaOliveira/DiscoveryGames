@@ -42,4 +42,5 @@ Onde configurar: painel da Cloudflare, R2, o bucket, Settings, CORS Policy ❓ (
 
 - O painel já inclui a origem do storage (`S3_ENDPOINT`) em `connect-src` e `media-src` do `Content-Security-Policy`. Se o endpoint mudar, reinicie o `web`.
 - O endpoint das URLs assinadas precisa ser alcançável pelo navegador (no R2, o endpoint da conta; num MinIO local, `localhost`).
+- No stack de desenvolvimento (`compose.yaml`), `S3_ENDPOINT=http://minio:9000` é o nome do serviço na rede interna do Docker e **não é alcançável pelo navegador do host**; o MinIO nem publica porta. O envio pelo navegador (e o player) nesse stack precisa de um `S3_ENDPOINT` alcançável pelo host (por exemplo, publicar a porta 9000 do MinIO e usar um nome que resolva para ele tanto no host quanto na rede do compose). Os testes de E2E não usam esse stack.
 - Os testes de E2E rodam contra um MinIO real, que aceita CORS de qualquer origem; a regra acima é só do R2 e continua **sem teste automático** ❓.
